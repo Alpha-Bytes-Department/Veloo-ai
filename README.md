@@ -6,7 +6,7 @@ An AI-powered quotation generation service built with FastAPI and OpenAI.
 
 - 🤖 AI-powered quotation generation using OpenAI GPT
 - 📄 RESTful API with comprehensive endpoints
-- 💾 SQLite database for quotation storage
+- 💾 MongoDB database for quotation storage
 - 🔍 Search and filter quotations
 - 📋 Customer-based quotation retrieval
 - 🚀 Fast and scalable with FastAPI
@@ -19,7 +19,21 @@ An AI-powered quotation generation service built with FastAPI and OpenAI.
 pip install -r requirements.txt
 ```
 
-### 2. Environment Configuration
+### 2. MongoDB Setup
+
+Install and start MongoDB:
+
+#### Option 1: Local MongoDB Installation
+- Download and install MongoDB from https://www.mongodb.com/try/download/community
+- Start MongoDB service
+- MongoDB will run on default port 27017
+
+#### Option 2: MongoDB Atlas (Cloud)
+- Create a free account at https://www.mongodb.com/atlas
+- Create a cluster and get your connection string
+- Update the `MONGODB_URI` in your `.env` file
+
+### 3. Environment Configuration
 
 Copy the example environment file and configure your settings:
 
@@ -27,13 +41,15 @@ Copy the example environment file and configure your settings:
 copy .env.example .env
 ```
 
-Edit `.env` and add your OpenAI API key:
+Edit `.env` and add your configuration:
 
 ```env
 OPENAI_API_KEY=your_actual_openai_api_key_here
+MONGODB_URI=mongodb://localhost:27017/
+DATABASE_NAME=quotation_db
 ```
 
-### 3. Run the Application
+### 4. Run the Application
 
 ```bash
 python main.py
@@ -80,7 +96,7 @@ The API will be available at: `http://localhost:8000`
 **Response:**
 ```json
 {
-  "id": 1,
+  "id": "507f1f77bcf86cd799439011",
   "customer_name": "John Doe",
   "phone_number": "+1234567890",
   "address": "123 Main St, City, State",
@@ -103,6 +119,18 @@ The API will be available at: `http://localhost:8000`
 #### Get Quotations by Customer
 - **GET** `/quotations/customer/{customer_name}`
 - Retrieves all quotations for a specific customer
+
+#### Search Quotations
+- **GET** `/quotations/search/{search_term}?limit=100`
+- Search quotations by text across multiple fields
+
+#### Get Quotations Count
+- **GET** `/quotations/count`
+- Get total count of quotations
+
+#### Update Quotation
+- **PUT** `/quotations/{quotation_id}`
+- Update an existing quotation with new AI-generated content
 
 #### Delete Quotation
 - **DELETE** `/quotations/{quotation_id}`
@@ -139,21 +167,40 @@ The API will be available at: `http://localhost:8000`
 
 ## Database
 
-The application uses SQLite for data persistence. The database file (`quotations.db`) will be created automatically when you first run the application.
+The application uses MongoDB for data persistence. MongoDB provides better scalability, flexibility, and performance compared to traditional relational databases.
 
-### Table Structure
+### Database Configuration
 
-**quotations**
-- `id` (INTEGER PRIMARY KEY)
-- `customer_name` (TEXT)
-- `phone_number` (TEXT)
-- `address` (TEXT)
-- `task_description` (TEXT)
-- `bill_of_materials` (TEXT)
-- `time` (TEXT)
-- `price` (TEXT)
-- `timestamp` (DATETIME)
-- `created_at` (DATETIME)
+Configure your MongoDB connection in the `.env` file:
+
+```env
+MONGODB_URI=mongodb://localhost:27017/  # For local MongoDB
+# or
+MONGODB_URI=mongodb+srv://username:password@cluster.mongodb.net/  # For MongoDB Atlas
+DATABASE_NAME=quotation_db
+```
+
+### Collection Structure
+
+**quotations collection**
+- `_id` (ObjectId) - MongoDB's unique identifier
+- `customer_name` (String)
+- `phone_number` (String)
+- `address` (String)
+- `task_description` (String)
+- `bill_of_materials` (String)
+- `time` (String)
+- `price` (String)
+- `timestamp` (Date)
+- `created_at` (Date)
+- `updated_at` (Date) - Added when quotation is updated
+
+### MongoDB Features Used
+
+- **Flexible Schema**: Easy to add new fields without migrations
+- **Indexes**: Optimized queries on customer_name, phone_number, created_at, and timestamp
+- **Text Search**: Full-text search across multiple fields
+- **Aggregation**: Efficient counting and data analysis
 
 ## Development
 
@@ -163,12 +210,11 @@ The application uses SQLite for data persistence. The database file (`quotations
 Veloo-ai/
 ├── main.py              # FastAPI application
 ├── quotation.py         # AI quotation generator
-├── database.py          # Database operations
+├── database.py          # MongoDB operations
 ├── schema.py           # Pydantic models
 ├── requirements.txt    # Dependencies
 ├── .env.example       # Environment template
-├── README.md          # Documentation
-└── quotations.db      # SQLite database (created automatically)
+└── README.md          # Documentation
 ```
 
 ### Testing
@@ -198,12 +244,13 @@ curl -X POST "http://localhost:8000/quotations/generate" \
 
 For production deployment:
 
-1. Set `API_RELOAD=False` in your `.env` file
-2. Configure proper CORS origins
-3. Use a production WSGI server like Gunicorn
-4. Consider using PostgreSQL instead of SQLite
+1. Use MongoDB Atlas or a properly configured MongoDB cluster
+2. Set `API_RELOAD=False` in your `.env` file
+3. Configure proper CORS origins
+4. Use a production WSGI server like Gunicorn
 5. Implement proper authentication and authorization
 6. Add logging and monitoring
+7. Use MongoDB connection pooling and replica sets for high availability
 
 ## License
 

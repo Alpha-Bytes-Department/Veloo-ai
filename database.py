@@ -1,188 +1,228 @@
-import sqlite3
-import json
+import pymongo
+from pymongo import MongoClient
 from typing import List, Optional, Dict
 from datetime import datetime
+from bson import ObjectId
+import os
+from dotenv import load_dotenv
 from schema import GeneratedQuotation
 
+# Load environment variables
+load_dotenv()
+
 class Database:
-    def __init__(self, db_name: str = "quotations.db"):
-        self.db_name = db_name
+    def __init__(self):
+        # Get MongoDB connection string from environment variable
+        self.connection_string = os.getenv("MONGODB_URI", "mongodb://localhost:27017/")
+        self.database_name = os.getenv("DATABASE_NAME", "quotation_db")
+        self.collection_name = "quotations"
+        
+        # Initialize MongoDB client
+        self.client = None
+        self.db = None
+        self.collection = None
+        
+    def connect(self):
+        """Establish connection to MongoDB"""
+        try:
+            self.client = MongoClient(self.connection_string)
+            self.db = self.client[self.database_name]
+            self.collection = self.db[self.collection_name]
+            
+            # Test the connection
+            self.client.admin.command('ping')
+            print("Successfully connected to MongoDB")
+            
+        except Exception as e:
+            print(f"Error connecting to MongoDB: {e}")
+            raise
     
-    def get_connection(self):
-        """Get database connection"""
-        conn = sqlite3.connect(self.db_name)
-        conn.row_factory = sqlite3.Row  # Enable dict-like access to rows
-        return conn
+    def disconnect(self):
+        """Close MongoDB connection"""
+        if self.client:
+            self.client.close()
     
     def init_db(self):
-        """Initialize the database with required tables"""
-        conn = self.get_connection()
+        """Initialize the database with required indexes"""
         try:
-            cursor = conn.cursor()
+            self.connect()
             
-            # Create quotations table
-            cursor.execute('''
-                CREATE TABLE IF NOT EXISTS quotations (
-                    id INTEGER PRIMARY KEY AUTOINCREMENT,
-                    customer_name TEXT NOT NULL,
-                    phone_number TEXT NOT NULL,
-                    address TEXT NOT NULL,
-                    task_description TEXT NOT NULL,
-                    bill_of_materials TEXT NOT NULL,
-                    time TEXT NOT NULL,
-                    price TEXT NOT NULL,
-                    timestamp DATETIME DEFAULT CURRENT_TIMESTAMP,
-                    created_at DATETIME DEFAULT CURRENT_TIMESTAMP
-                )
-            ''')
+            # Create indexes for better performance
+            self.collection.create_index([("customer_name", 1)])
+            self.collection.create_index([("phone_number", 1)])
+            self.collection.create_index([("created_at", -1)])
+            self.collection.create_index([("timestamp", -1)])
             
-            conn.commit()
-            print("Database initialized successfully")
+            print("Database initialized successfully with indexes")
             
         except Exception as e:
             print(f"Error initializing database: {e}")
-            conn.rollback()
-        finally:
-            conn.close()
+            raise
     
-    def save_quotation(self, quotation: GeneratedQuotation) -> int:
+    def save_quotation(self, quotation: GeneratedQuotation) -> str:
         """Save a quotation to the database"""
-        conn = self.get_connection()
         try:
-            cursor = conn.cursor()
+            if not self.collection:
+                self.connect()
             
-            cursor.execute('''
-                INSERT INTO quotations (
-                    customer_name, phone_number, address, task_description,
-                    bill_of_materials, time, price, timestamp
-                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?)
-            ''', (
-                quotation.customer_name,
-                quotation.phone_number,
-                quotation.address,
-                quotation.task_description,
-                quotation.bill_of_materials,
-                quotation.time,
-                quotation.price,
-                quotation.timestamp or datetime.now()
-            ))
+            # Convert Pydantic model to dict
+            quotation_dict = quotation.dict()
             
-            quotation_id = cursor.lastrowid
-            conn.commit()
-            return quotation_id
+            # Add timestamps
+            quotation_dict["created_at"] = datetime.now()
+            if not quotation_dict.get("timestamp"):
+                quotation_dict["timestamp"] = datetime.now()
+            
+            # Insert into MongoDB
+            result = self.collection.insert_one(quotation_dict)
+            return str(result.inserted_id)
             
         except Exception as e:
-            conn.rollback()
             raise Exception(f"Error saving quotation: {e}")
-        finally:
-            conn.close()
     
-    def get_quotation_by_id(self, quotation_id: int) -> Optional[Dict]:
+    def get_quotation_by_id(self, quotation_id: str) -> Optional[Dict]:
         """Get a quotation by its ID"""
-        conn = self.get_connection()
         try:
-            cursor = conn.cursor()
-            cursor.execute('SELECT * FROM quotations WHERE id = ?', (quotation_id,))
-            row = cursor.fetchone()
+            if not self.collection:
+                self.connect()
             
-            if row:
-                return dict(row)
+            # Convert string ID to ObjectId
+            object_id = ObjectId(quotation_id)
+            
+            quotation = self.collection.find_one({"_id": object_id})
+            
+            if quotation:
+                # Convert ObjectId to string for JSON serialization
+                quotation["id"] = str(quotation["_id"])
+                del quotation["_id"]
+                return quotation
             return None
             
         except Exception as e:
             raise Exception(f"Error fetching quotation: {e}")
-        finally:
-            conn.close()
     
     def get_all_quotations(self, limit: int = 100, offset: int = 0) -> List[Dict]:
         """Get all quotations with pagination"""
-        conn = self.get_connection()
         try:
-            cursor = conn.cursor()
-            cursor.execute('''
-                SELECT * FROM quotations 
-                ORDER BY created_at DESC 
-                LIMIT ? OFFSET ?
-            ''', (limit, offset))
+            if not self.collection:
+                self.connect()
             
-            rows = cursor.fetchall()
-            return [dict(row) for row in rows]
+            # Use MongoDB's skip and limit for pagination
+            cursor = self.collection.find().sort("created_at", -1).skip(offset).limit(limit)
+            
+            quotations = []
+            for doc in cursor:
+                # Convert ObjectId to string
+                doc["id"] = str(doc["_id"])
+                del doc["_id"]
+                quotations.append(doc)
+            
+            return quotations
             
         except Exception as e:
             raise Exception(f"Error fetching quotations: {e}")
-        finally:
-            conn.close()
     
     def get_quotations_by_customer(self, customer_name: str) -> List[Dict]:
         """Get all quotations for a specific customer"""
-        conn = self.get_connection()
         try:
-            cursor = conn.cursor()
-            cursor.execute('''
-                SELECT * FROM quotations 
-                WHERE customer_name LIKE ? 
-                ORDER BY created_at DESC
-            ''', (f"%{customer_name}%",))
+            if not self.collection:
+                self.connect()
             
-            rows = cursor.fetchall()
-            return [dict(row) for row in rows]
+            # Use regex for case-insensitive partial matching
+            query = {"customer_name": {"$regex": customer_name, "$options": "i"}}
+            cursor = self.collection.find(query).sort("created_at", -1)
+            
+            quotations = []
+            for doc in cursor:
+                # Convert ObjectId to string
+                doc["id"] = str(doc["_id"])
+                del doc["_id"]
+                quotations.append(doc)
+            
+            return quotations
             
         except Exception as e:
             raise Exception(f"Error fetching customer quotations: {e}")
-        finally:
-            conn.close()
     
-    def delete_quotation(self, quotation_id: int) -> bool:
+    def delete_quotation(self, quotation_id: str) -> bool:
         """Delete a quotation by ID"""
-        conn = self.get_connection()
         try:
-            cursor = conn.cursor()
-            cursor.execute('DELETE FROM quotations WHERE id = ?', (quotation_id,))
+            if not self.collection:
+                self.connect()
             
-            if cursor.rowcount > 0:
-                conn.commit()
-                return True
-            else:
-                return False
+            # Convert string ID to ObjectId
+            object_id = ObjectId(quotation_id)
+            
+            result = self.collection.delete_one({"_id": object_id})
+            return result.deleted_count > 0
                 
         except Exception as e:
-            conn.rollback()
             raise Exception(f"Error deleting quotation: {e}")
-        finally:
-            conn.close()
     
-    def update_quotation(self, quotation_id: int, quotation: GeneratedQuotation) -> bool:
+    def update_quotation(self, quotation_id: str, quotation: GeneratedQuotation) -> bool:
         """Update an existing quotation"""
-        conn = self.get_connection()
         try:
-            cursor = conn.cursor()
+            if not self.collection:
+                self.connect()
             
-            cursor.execute('''
-                UPDATE quotations SET
-                    customer_name = ?, phone_number = ?, address = ?,
-                    task_description = ?, bill_of_materials = ?,
-                    time = ?, price = ?, timestamp = ?
-                WHERE id = ?
-            ''', (
-                quotation.customer_name,
-                quotation.phone_number,
-                quotation.address,
-                quotation.task_description,
-                quotation.bill_of_materials,
-                quotation.time,
-                quotation.price,
-                quotation.timestamp or datetime.now(),
-                quotation_id
-            ))
+            # Convert string ID to ObjectId
+            object_id = ObjectId(quotation_id)
             
-            if cursor.rowcount > 0:
-                conn.commit()
-                return True
-            else:
-                return False
+            # Convert Pydantic model to dict
+            update_data = quotation.dict()
+            
+            # Update timestamp
+            update_data["timestamp"] = quotation.timestamp or datetime.now()
+            update_data["updated_at"] = datetime.now()
+            
+            result = self.collection.update_one(
+                {"_id": object_id},
+                {"$set": update_data}
+            )
+            
+            return result.modified_count > 0
                 
         except Exception as e:
-            conn.rollback()
             raise Exception(f"Error updating quotation: {e}")
-        finally:
-            conn.close()
+    
+    def get_quotations_count(self) -> int:
+        """Get total count of quotations"""
+        try:
+            if not self.collection:
+                self.connect()
+            
+            return self.collection.count_documents({})
+            
+        except Exception as e:
+            raise Exception(f"Error counting quotations: {e}")
+    
+    def search_quotations(self, search_term: str, limit: int = 100) -> List[Dict]:
+        """Search quotations by text across multiple fields"""
+        try:
+            if not self.collection:
+                self.connect()
+            
+            # Create text search query
+            query = {
+                "$or": [
+                    {"customer_name": {"$regex": search_term, "$options": "i"}},
+                    {"phone_number": {"$regex": search_term, "$options": "i"}},
+                    {"address": {"$regex": search_term, "$options": "i"}},
+                    {"task_description": {"$regex": search_term, "$options": "i"}},
+                    {"bill_of_materials": {"$regex": search_term, "$options": "i"}}
+                ]
+            }
+            
+            cursor = self.collection.find(query).sort("created_at", -1).limit(limit)
+            
+            quotations = []
+            for doc in cursor:
+                # Convert ObjectId to string
+                doc["id"] = str(doc["_id"])
+                del doc["_id"]
+                quotations.append(doc)
+            
+            return quotations
+            
+        except Exception as e:
+            raise Exception(f"Error searching quotations: {e}")
