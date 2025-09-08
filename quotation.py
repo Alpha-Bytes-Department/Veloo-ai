@@ -19,7 +19,7 @@ class Generator:
     def generate_quotation(self, quotation_request: QuotationRequest) -> GeneratedQuotation:
         try:
             # Create a detailed prompt from the request data
-            user_message = f"""
+            user_input = f"""
             Generate a professional quotation for the following customer:
             
             Customer Name: {quotation_request.customer_name}
@@ -38,30 +38,16 @@ class Generator:
             
             messages = [
                 {"role": "system", "content": self.system_prompt},
-                {"role": "user", "content": user_message}
+                {"role": "user", "content": user_input}
             ]
             
-            response = self.client.chat.completions.create(
-                model="gpt-3.5-turbo",
+            response = self.client.responses.parse(
+                model="gpt-4.1-mini",
                 messages=messages,
-                temperature=0.7,
-                max_tokens=1500
+                text_format=GeneratedQuotation,
             )
             
-            # Parse the response and create a structured quotation
-            ai_response = response.choices[0].message.content
-            
-            # Create the quotation object
-            quotation = GeneratedQuotation(
-                customer_name=quotation_request.customer_name,
-                phone_number=quotation_request.phone_number,
-                address=quotation_request.address,
-                task_description=quotation_request.select_task,
-                bill_of_materials=ai_response,  # You might want to parse this better
-                time=quotation_request.project_start,
-                price="To be calculated",  # Extract from AI response
-                timestamp=datetime.now()
-            )
+            quotation = response.output_parsed
             
             return quotation
         
