@@ -54,3 +54,39 @@ class Generator:
         except Exception as e:
             raise Exception(f"Error generating quotation: {str(e)}")
     
+
+    def update_quotation(self, user_message: str, update_request: GeneratedQuotation) -> GeneratedQuotation:
+        try:
+            # Create a detailed prompt from the request data
+            user_input = f"""
+            Generate a professional quotation for the following customer:
+            
+            Customer Name: {update_request.customer_name}
+            Phone: {update_request.phone_number}
+            Address: {update_request.address}
+            Task Description: {update_request.task_description}
+            Bill of Materials: {update_request.bill_of_materials}
+            Time: {update_request.time}
+            Price: {update_request.price}
+            
+            Please update the quotation as per user request:
+            {user_message}
+            """
+            
+            messages = [
+                {"role": "system", "content": self.system_prompt},
+                {"role": "user", "content": user_input}
+            ]
+            
+            response = self.client.responses.parse(
+                model="gpt-4.1-mini",
+                input=messages,
+                text_format=GeneratedQuotation,
+            )
+            
+            quotation = response.output_parsed
+            
+            return quotation
+        
+        except Exception as e:
+            raise Exception(f"Error generating quotation: {str(e)}")

@@ -11,7 +11,6 @@ class QuotationRequest(BaseModel):
     explaination: str
     timestamp: Optional[datetime] = None
 
-
 class GeneratedQuotation(BaseModel):
     customer_name: str
     phone_number: str
@@ -21,6 +20,10 @@ class GeneratedQuotation(BaseModel):
     time: str 
     price: str
     timestamp: Optional[datetime] = None
+
+class UpdateQuotationRequest(BaseModel):
+    user_message: str
+    quotation: GeneratedQuotation
 
 
 
