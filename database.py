@@ -62,7 +62,7 @@ class Database:
     def save_quotation(self, quotation: GeneratedQuotation) -> str:
         """Save a quotation to the database"""
         try:
-            if not self.collection:
+            if self.collection is None:
                 self.connect()
             
             # Convert Pydantic model to dict
@@ -83,7 +83,7 @@ class Database:
     def get_quotation_by_id(self, quotation_id: str) -> Optional[Dict]:
         """Get a quotation by its ID"""
         try:
-            if not self.collection:
+            if self.collection is None:
                 self.connect()
             
             # Convert string ID to ObjectId
@@ -104,7 +104,7 @@ class Database:
     def get_all_quotations(self, limit: int = 100, offset: int = 0) -> List[Dict]:
         """Get all quotations with pagination"""
         try:
-            if not self.collection:
+            if self.collection is None:
                 self.connect()
             
             # Use MongoDB's skip and limit for pagination
@@ -125,7 +125,7 @@ class Database:
     def get_quotations_by_customer(self, customer_name: str) -> List[Dict]:
         """Get all quotations for a specific customer"""
         try:
-            if not self.collection:
+            if self.collection is None:
                 self.connect()
             
             # Use regex for case-insensitive partial matching
@@ -147,7 +147,7 @@ class Database:
     def delete_quotation(self, quotation_id: str) -> bool:
         """Delete a quotation by ID"""
         try:
-            if not self.collection:
+            if self.collection is None:
                 self.connect()
             
             # Convert string ID to ObjectId
@@ -162,7 +162,7 @@ class Database:
     def update_quotation(self, quotation_id: str, quotation: GeneratedQuotation) -> bool:
         """Update an existing quotation"""
         try:
-            if not self.collection:
+            if self.collection is None:
                 self.connect()
             
             # Convert string ID to ObjectId
@@ -188,7 +188,7 @@ class Database:
     def get_quotations_count(self) -> int:
         """Get total count of quotations"""
         try:
-            if not self.collection:
+            if self.collection is None:
                 self.connect()
             
             return self.collection.count_documents({})
@@ -199,7 +199,7 @@ class Database:
     def search_quotations(self, search_term: str, limit: int = 100) -> List[Dict]:
         """Search quotations by text across multiple fields"""
         try:
-            if not self.collection:
+            if self.collection is None:
                 self.connect()
             
             # Create text search query

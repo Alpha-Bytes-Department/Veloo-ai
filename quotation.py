@@ -43,7 +43,7 @@ class Generator:
             
             response = self.client.responses.parse(
                 model="gpt-4.1-mini",
-                messages=messages,
+                input=messages,
                 text_format=GeneratedQuotation,
             )
             
