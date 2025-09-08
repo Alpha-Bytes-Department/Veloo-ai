@@ -2,7 +2,7 @@ from openai import OpenAI
 from typing import List, Dict
 import os
 import json
-from schema import QuotationRequest, GeneratedQuotation
+from schema import QuotationRequest, FinalQuotation
 from dotenv import load_dotenv
 from datetime import datetime
 
@@ -16,7 +16,7 @@ class Generator:
         Provide comprehensive bill of materials, time estimates, and accurate pricing.
         Format your response as a structured quotation with all required fields."""
 
-    def generate_quotation(self, quotation_request: QuotationRequest) -> GeneratedQuotation:
+    def generate_quotation(self, quotation_request: QuotationRequest) -> FinalQuotation:
         try:
             # Create a detailed prompt from the request data
             user_input = f"""
@@ -44,7 +44,7 @@ class Generator:
             response = self.client.responses.parse(
                 model="gpt-4.1-mini",
                 input=messages,
-                text_format=GeneratedQuotation,
+                text_format=FinalQuotation,
             )
             
             quotation = response.output_parsed
@@ -55,7 +55,7 @@ class Generator:
             raise Exception(f"Error generating quotation: {str(e)}")
     
 
-    def update_quotation(self, user_message: str, update_request: GeneratedQuotation) -> GeneratedQuotation:
+    def update_quotation(self, user_message: str, update_request: FinalQuotation) -> FinalQuotation:
         try:
             # Create a detailed prompt from the request data
             user_input = f"""
@@ -81,7 +81,7 @@ class Generator:
             response = self.client.responses.parse(
                 model="gpt-4.1-mini",
                 input=messages,
-                text_format=GeneratedQuotation,
+                text_format=FinalQuotation,
             )
             
             quotation = response.output_parsed

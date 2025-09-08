@@ -5,7 +5,7 @@ from datetime import datetime
 from contextlib import asynccontextmanager
 import json
 
-from schema import QuotationRequest, GeneratedQuotation, UpdateQuotationRequest
+from schema import QuotationRequest, FinalQuotation, UpdateQuotationRequest
 from quotation import Generator
 from database import Database
 
@@ -64,7 +64,7 @@ async def health_check():
     """Health check endpoint"""
     return {"status": "healthy", "timestamp": datetime.now()}
 
-@app.post("/quotations/generate", response_model=GeneratedQuotation)
+@app.post("/quotations/generate", response_model=FinalQuotation)
 async def generate_quotation(request: QuotationRequest):
     """Generate a new quotation using AI"""
     try:
