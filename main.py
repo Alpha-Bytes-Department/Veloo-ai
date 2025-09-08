@@ -2,17 +2,32 @@ from fastapi import FastAPI, HTTPException, Depends
 from fastapi.middleware.cors import CORSMiddleware
 from typing import List, Optional
 from datetime import datetime
+from contextlib import asynccontextmanager
 import json
 
 from schema import QuotationRequest, GeneratedQuotation
 from quotation import Generator
 from database import Database
 
+# Initialize components
+generator = Generator()
+database = Database()
+
+@asynccontextmanager
+async def lifespan(app: FastAPI):
+    """Application lifespan handler"""
+    # Startup
+    database.init_db()
+    yield
+    # Shutdown (if needed)
+    database.disconnect()
+
 # Initialize FastAPI app
 app = FastAPI(
     title="Quotation Generator API",
     description="AI-powered quotation generation service",
-    version="1.0.0"
+    version="1.0.0",
+    lifespan=lifespan
 )
 
 # Add CORS middleware
@@ -23,15 +38,6 @@ app.add_middleware(
     allow_methods=["*"],
     allow_headers=["*"],
 )
-
-# Initialize components
-generator = Generator()
-database = Database()
-
-@app.on_event("startup")
-async def startup_event():
-    """Initialize database on startup"""
-    database.init_db()
 
 @app.get("/")
 async def root():
