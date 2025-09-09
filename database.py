@@ -5,7 +5,7 @@ from datetime import datetime
 from bson import ObjectId
 import os
 from dotenv import load_dotenv
-from schema import GeneratedQuotation
+from schema import FinalQuotation
 
 # Load environment variables
 load_dotenv()
@@ -59,7 +59,7 @@ class Database:
             print(f"Error initializing database: {e}")
             raise
     
-    def save_quotation(self, quotation: GeneratedQuotation) -> str:
+    def save_quotation(self, quotation: FinalQuotation) -> str:
         """Save a quotation to the database"""
         try:
             if self.collection is None:
@@ -159,7 +159,7 @@ class Database:
         except Exception as e:
             raise Exception(f"Error deleting quotation: {e}")
     
-    def update_quotation(self, quotation_id: str, quotation: GeneratedQuotation) -> bool:
+    def update_quotation(self, quotation_id: str, quotation: FinalQuotation) -> bool:
         """Update an existing quotation"""
         try:
             if self.collection is None:
