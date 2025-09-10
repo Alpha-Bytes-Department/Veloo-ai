@@ -48,6 +48,7 @@ async def root():
         "database": "MongoDB",
         "endpoints": {
             "generate_quotation": "/quotations/generate",
+            "save_quotation": "/quotations/save",
             "get_quotations": "/quotations",
             "get_quotation": "/quotations/{quotation_id}",
             "update_quotation": "/quotations/{quotation_id}",
@@ -79,6 +80,26 @@ async def generate_quotation(request: QuotationRequest):
         quotation_dict["id"] = quotation_id
         
         return quotation_dict
+    
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+@app.post("/quotations/save", response_model=dict)
+async def save_quotation(quotation: FinalQuotation):
+    """Save a final quotation directly to the database"""
+    try:
+        # Save the quotation to database
+        quotation_id = database.save_quotation(quotation)
+        
+        # Return the saved quotation with its ID
+        quotation_dict = quotation.dict()
+        quotation_dict["id"] = quotation_id
+        
+        return {
+            "message": "Quotation saved successfully",
+            "quotation_id": quotation_id,
+            "quotation": quotation_dict
+        }
     
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
