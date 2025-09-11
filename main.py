@@ -174,10 +174,22 @@ async def update_quotation(quotation_id: str, request: UpdateQuotationRequest):
         if not existing_quotation:
             raise HTTPException(status_code=404, detail="Quotation not found")
         
+        # Convert the database result to FinalQuotation object
+        existing_final_quotation = FinalQuotation(
+            customer_name=existing_quotation.get("customer_name", ""),
+            phone_number=existing_quotation.get("phone_number", ""),
+            address=existing_quotation.get("address", ""),
+            task_description=existing_quotation.get("task_description", ""),
+            bill_of_materials=existing_quotation.get("bill_of_materials", ""),
+            time=existing_quotation.get("time", ""),
+            price=existing_quotation.get("price", ""),
+            timestamp=existing_quotation.get("timestamp")
+        )
+        
         # Use the generator's update_quotation method
         updated_quotation = generator.update_quotation(
             user_message=request.user_message,
-            update_request=request.quotation
+            update_request=existing_final_quotation
         )
         
         # Save the updated quotation to database
