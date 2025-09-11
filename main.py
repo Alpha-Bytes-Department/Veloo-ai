@@ -165,12 +165,12 @@ async def get_quotations_count():
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
 
-@app.put("/quotations/{quotation_id}", response_model=dict)
-async def update_quotation(quotation_id: str, request: UpdateQuotationRequest):
+@app.put("/quotations/update", response_model=dict)
+async def update_quotation(request: UpdateQuotationRequest):
     """Update an existing quotation by ID using AI and save to database"""
     try:
         # First check if quotation exists
-        existing_quotation = database.get_quotation_by_id(quotation_id)
+        existing_quotation = database.get_quotation_by_id(request.quotation_id)
         if not existing_quotation:
             raise HTTPException(status_code=404, detail="Quotation not found")
         
@@ -193,13 +193,13 @@ async def update_quotation(quotation_id: str, request: UpdateQuotationRequest):
         )
         
         # Save the updated quotation to database
-        success = database.update_quotation(quotation_id, updated_quotation)
+        success = database.update_quotation(request.quotation_id, updated_quotation)
         if not success:
             raise HTTPException(status_code=500, detail="Failed to update quotation in database")
         
         # Return the updated quotation with ID
         result = updated_quotation.dict()
-        result["id"] = quotation_id
+        result["id"] = request.quotation_id
         
         return result
     
