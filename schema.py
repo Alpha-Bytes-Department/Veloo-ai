@@ -24,7 +24,3 @@ class FinalQuotation(BaseModel):
 class UpdateQuotationRequest(BaseModel):
     quotation_id: str
     user_message: str
-    
-
-
-
