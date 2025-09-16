@@ -128,7 +128,7 @@ async def get_quotation(quotation_id: str):
         raise HTTPException(status_code=500, detail=str(e))
 
 @app.delete("/quotations/{quotation_id}")
-async def delete_quotation(quotation_id: str):
+async def delete_quotation(quotation_id: str): 
     """Delete a specific quotation"""
     try:
         success = database.delete_quotation(quotation_id)

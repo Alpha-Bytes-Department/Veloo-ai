@@ -1,5 +1,5 @@
 from pydantic import BaseModel
-from typing import List, Optional
+from typing import List, Optional, Dict
 from datetime import datetime
 
 class QuotationRequest(BaseModel):
@@ -16,7 +16,7 @@ class FinalQuotation(BaseModel):
     phone_number: str
     address: str
     task_description: str 
-    bill_of_materials: str
+    bill_of_materials: List[str]
     time: str 
     price: str
     timestamp: Optional[datetime] = None
