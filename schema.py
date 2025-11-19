@@ -16,12 +16,20 @@ class QuotationRequest(BaseModel):
     explaination: str
     timestamp: Optional[datetime] = None
 
+class Materials(BaseModel):
+    category: str
+    material: str 	
+    price: str	
+    description: str
+    unit: str	
+    quantity: str
+
 class FinalQuotation(BaseModel):
     customer_name: str
     phone_number: str
     address: str
     task_description: str 
-    bill_of_materials: List[str]
+    bill_of_materials: List[Materials]
     time: str 
     price: PriceDetail
     timestamp: Optional[datetime] = None
