@@ -5,13 +5,20 @@ from datetime import datetime
 from contextlib import asynccontextmanager
 import json
 
-from schema import QuotationRequest, FinalQuotation, UpdateQuotationRequest
+from schema import (
+    QuotationRequest, 
+    FinalQuotation, 
+    UpdateQuotationRequest,
+    InventoryItem,
+    InventoryItemUpdate,
+    InventorySearchQuery
+)
 from quotation import Generator
 from database import Database
 
 # Initialize components
-generator = Generator()
 database = Database()
+generator = Generator(database=database)  # Pass database instance to generator
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
@@ -189,7 +196,141 @@ async def update_quotation(request: UpdateQuotationRequest):
         raise HTTPException(status_code=500, detail=str(e))
 
 
+# ==================== INVENTORY/MATERIALS ENDPOINTS ====================
+
+@app.post("/inventory", response_model=dict)
+async def create_inventory_item(item: InventoryItem):
+    """Create a new inventory/material item"""
+    try:
+        item_id = database.create_inventory_item(item)
+        
+        item_dict = item.dict()
+        item_dict["id"] = item_id
+        
+        return {
+            "message": "Inventory item created successfully",
+            "item_id": item_id,
+            "item": item_dict
+        }
+    
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+@app.get("/inventory", response_model=List[dict])
+async def get_all_inventory(
+    limit: Optional[int] = 100,
+    offset: Optional[int] = 0,
+    is_active: Optional[bool] = None,
+    category: Optional[str] = None
+):
+    """Get all inventory items with optional filters and pagination"""
+    try:
+        items = database.get_all_inventory_items(
+            limit=limit, 
+            offset=offset, 
+            is_active=is_active,
+            category=category
+        )
+        return items
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+@app.get("/inventory/{item_id}")
+async def get_inventory_item(item_id: str):
+    """Get a specific inventory item by ID"""
+    try:
+        item = database.get_inventory_item_by_id(item_id)
+        if not item:
+            raise HTTPException(status_code=404, detail="Inventory item not found")
+        return item
+    except HTTPException:
+        raise
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+@app.put("/inventory/{item_id}", response_model=dict)
+async def update_inventory_item(item_id: str, update_data: InventoryItemUpdate):
+    """Update an existing inventory item"""
+    try:
+        # Check if item exists
+        existing_item = database.get_inventory_item_by_id(item_id)
+        if not existing_item:
+            raise HTTPException(status_code=404, detail="Inventory item not found")
+        
+        # Update the item
+        success = database.update_inventory_item(item_id, update_data.dict(exclude_none=True))
+        
+        if not success:
+            raise HTTPException(status_code=500, detail="Failed to update inventory item")
+        
+        # Get updated item
+        updated_item = database.get_inventory_item_by_id(item_id)
+        
+        return {
+            "message": "Inventory item updated successfully",
+            "item": updated_item
+        }
+    
+    except HTTPException:
+        raise
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+@app.delete("/inventory/{item_id}")
+async def delete_inventory_item(item_id: str):
+    """Delete a specific inventory item"""
+    try:
+        success = database.delete_inventory_item(item_id)
+        if not success:
+            raise HTTPException(status_code=404, detail="Inventory item not found")
+        return {"message": "Inventory item deleted successfully"}
+    except HTTPException:
+        raise
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+@app.post("/inventory/search", response_model=List[dict])
+async def search_inventory(search_query: InventorySearchQuery):
+    """Search inventory items by text across multiple fields"""
+    try:
+        items = database.search_inventory_items(
+            search_term=search_query.query,
+            category=search_query.category,
+            is_active=search_query.is_active,
+            limit=100
+        )
+        return items
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+@app.get("/inventory/category/{category}")
+async def get_inventory_by_category(category: str):
+    """Get all inventory items in a specific category"""
+    try:
+        items = database.get_inventory_by_category(category)
+        return items
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+@app.get("/inventory/stats/count")
+async def get_inventory_count(is_active: Optional[bool] = None):
+    """Get total count of inventory items"""
+    try:
+        count = database.get_inventory_count(is_active=is_active)
+        return {"total_items": count}
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+@app.get("/inventory/stats/low-stock")
+async def get_low_stock_items():
+    """Get items that are below minimum quantity threshold"""
+    try:
+        items = database.get_low_stock_items()
+        return items
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
 
 if __name__ == "__main__":
     import uvicorn
-    uvicorn.run("main:app", host="127.0.0.1", port=8000, reload=True)
+    uvicorn.run("main:app", host="0.0.0.0", port=8000, reload=True)
