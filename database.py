@@ -436,34 +436,4 @@ class Database:
         except Exception as e:
             raise Exception(f"Error fetching inventory by category: {e}")
     
-    def get_low_stock_items(self) -> List[Dict]:
-        """Get items that are below minimum quantity threshold"""
-        try:
-            if self.inventory_collection is None:
-                self.connect()
-            
-            # Find items where quantity_available is less than minimum_quantity
-            query = {
-                "$expr": {
-                    "$and": [
-                        {"$ne": ["$minimum_quantity", None]},
-                        {"$lt": ["$quantity_available", "$minimum_quantity"]}
-                    ]
-                },
-                "is_active": True
-            }
-            
-            cursor = self.inventory_collection.find(query).sort("quantity_available", 1)
-            
-            items = []
-            for doc in cursor:
-                # Convert ObjectId to string
-                doc["id"] = str(doc["_id"])
-                del doc["_id"]
-                items.append(doc)
-            
-            return items
-            
-        except Exception as e:
-            raise Exception(f"Error fetching low stock items: {e}")
-
+    
