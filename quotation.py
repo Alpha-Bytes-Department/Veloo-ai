@@ -104,6 +104,7 @@ class Generator:
             Task Selected: {quotation_request.select_task}
             Additional Details: {quotation_request.explaination}
             Time: {datetime.now().isoformat()}
+            Materials Ordered: False (Set by default)
             
             Please provide:
             1. Detailed task description
