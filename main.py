@@ -321,15 +321,6 @@ async def get_inventory_count(is_active: Optional[bool] = None):
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
 
-@app.get("/inventory/stats/low-stock")
-async def get_low_stock_items():
-    """Get items that are below minimum quantity threshold"""
-    try:
-        items = database.get_low_stock_items()
-        return items
-    except Exception as e:
-        raise HTTPException(status_code=500, detail=str(e))
-
 
 if __name__ == "__main__":
     import uvicorn
