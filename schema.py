@@ -25,6 +25,7 @@ class FinalQuotation(BaseModel):
     time: str 
     price: PriceDetail
     timestamp: Optional[datetime] = None
+    materials_ordered: bool = False  # Default to False if not specified
 
 class UpdateQuotationRequest(BaseModel):
     quotation_id: str
