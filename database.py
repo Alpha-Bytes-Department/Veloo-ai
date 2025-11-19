@@ -236,6 +236,47 @@ class Database:
             
         except Exception as e:
             raise Exception(f"Error searching quotations: {e}")
+    
+    def toggle_materials_ordered(self, quotation_id: str) -> Dict:
+        """Toggle the materials_ordered status of a quotation"""
+        try:
+            if self.collection is None:
+                self.connect()
+            
+            # Convert string ID to ObjectId
+            object_id = ObjectId(quotation_id)
+            
+            # Get current quotation
+            quotation = self.collection.find_one({"_id": object_id})
+            if not quotation:
+                raise Exception("Quotation not found")
+            
+            # Toggle the materials_ordered status
+            current_status = quotation.get("materials_ordered", False)
+            new_status = not current_status
+            
+            # Update the quotation
+            result = self.collection.update_one(
+                {"_id": object_id},
+                {
+                    "$set": {
+                        "materials_ordered": new_status,
+                        "updated_at": datetime.now()
+                    }
+                }
+            )
+            
+            if result.modified_count > 0:
+                return {
+                    "success": True,
+                    "quotation_id": quotation_id,
+                    "materials_ordered": new_status
+                }
+            else:
+                raise Exception("Failed to update quotation")
+                
+        except Exception as e:
+            raise Exception(f"Error toggling materials_ordered status: {e}")
 
     # ==================== INVENTORY MANAGEMENT METHODS ====================
     
