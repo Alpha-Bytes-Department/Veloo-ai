@@ -39,26 +39,6 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-@app.get("/")
-async def root():
-    """Root endpoint with API information"""
-    return {
-        "message": "Quotation Generator API",
-        "version": "1.0.0",
-        "database": "MongoDB",
-        "endpoints": {
-            "generate_quotation": "/quotations/generate",
-            "save_quotation": "/quotations/save",
-            "get_quotations": "/quotations",
-            "get_quotation": "/quotations/{quotation_id}",
-            "update_quotation": "/quotations/{quotation_id}",
-            "delete_quotation": "/quotations/{quotation_id}",
-            "get_customer_quotations": "/quotations/customer/{customer_name}",
-            "search_quotations": "/quotations/search/{search_term}",
-            "quotations_count": "/quotations/count",
-            "health": "/health"
-        }
-    }
 
 @app.get("/health")
 async def health_check():
