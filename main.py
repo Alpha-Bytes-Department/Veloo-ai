@@ -170,7 +170,8 @@ async def update_quotation(request: UpdateQuotationRequest):
             bill_of_materials=existing_quotation.get("bill_of_materials", ""),
             time=existing_quotation.get("time", ""),
             price=existing_quotation.get("price", ""),
-            timestamp=existing_quotation.get("timestamp")
+            timestamp=existing_quotation.get("timestamp"),
+            materials_ordered=existing_quotation.get("materials_ordered", False)
         )
         
         # Use the generator's update_quotation method
@@ -193,6 +194,21 @@ async def update_quotation(request: UpdateQuotationRequest):
     except HTTPException:
         raise
     except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+@app.put("/quotations/{quotation_id}/materials-ordered")
+async def toggle_materials_ordered(quotation_id: str):
+    """Toggle the materials_ordered status of a quotation"""
+    try:
+        result = database.toggle_materials_ordered(quotation_id)
+        return {
+            "message": "Materials ordered status toggled successfully",
+            "quotation_id": result["quotation_id"],
+            "materials_ordered": result["materials_ordered"]
+        }
+    except Exception as e:
+        if "not found" in str(e).lower():
+            raise HTTPException(status_code=404, detail="Quotation not found")
         raise HTTPException(status_code=500, detail=str(e))
 
 
