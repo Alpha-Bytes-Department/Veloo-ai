@@ -9,8 +9,9 @@ from datetime import datetime
 load_dotenv()
 
 class Generator:
-    def __init__(self):
+    def __init__(self, database=None):
         self.client = OpenAI(api_key=os.getenv("OPENAI_API_KEY"))
+        self.database = database  # Store database reference for inventory queries
 
         # Define tool schema for function calling
         self.tools = [
@@ -43,9 +44,51 @@ class Generator:
         Get inventory data from database based on query.
         This function should retrieve relevant inventory, pricing, and availability data.
         """
-        # TODO: Implement database query logic here
-        # This is a placeholder - implement your actual database query
-        pass 
+        try:
+            if not self.database:
+                return {
+                    "error": "Database connection not available",
+                    "items": []
+                }
+            
+            # Search inventory items based on the query
+            items = self.database.search_inventory_items(
+                search_term=query,
+                is_active=True,
+                limit=50
+            )
+            
+            if not items:
+                return {
+                    "message": f"No inventory items found for query: {query}",
+                    "items": []
+                }
+            
+            # Format the inventory data for the AI model
+            formatted_items = []
+            for item in items:
+                formatted_items.append({
+                    "name": item.get("name"),
+                    "category": item.get("category"),
+                    "description": item.get("description", ""),
+                    "unit": item.get("unit"),
+                    "unit_price": item.get("unit_price"),
+                    "quantity_available": item.get("quantity_available"),
+                    "supplier": item.get("supplier", ""),
+                    "sku": item.get("sku", "")
+                })
+            
+            return {
+                "query": query,
+                "items_found": len(formatted_items),
+                "items": formatted_items
+            }
+            
+        except Exception as e:
+            return {
+                "error": f"Error fetching inventory data: {str(e)}",
+                "items": []
+            } 
     
     
     def generate_quotation(self, quotation_request: QuotationRequest) -> FinalQuotation:
@@ -69,49 +112,58 @@ class Generator:
             4. Total price breakdown
             """
             
-            # Create a running input list for tool calling
-            input_list = [
+            # Create messages for chat completion
+            messages = [
                 {"role": "system", "content": self.system_prompt},
                 {"role": "user", "content": user_input}
             ]
             
             # 1. Prompt the model with tools defined
-            response = self.client.responses.create(
-                model="gpt-4.1-mini",
+            response = self.client.chat.completions.create(
+                model="gpt-4o-mini",
                 tools=self.tools,
-                input=input_list,
+                messages=messages,
             )
             
-            # Save function call outputs for subsequent requests
-            input_list += response.output
+            response_message = response.choices[0].message
+            tool_calls = response_message.tool_calls
             
             # 2. Check if model made any function calls
-            for item in response.output:
-                if item.type == "function_call":
-                    if item.name == "get_inventory_data":
-                        # 3. Execute the function logic for get_inventory_data
-                        arguments = json.loads(item.arguments)
+            if tool_calls:
+                # Add assistant's response to messages
+                messages.append(response_message)
+                
+                # 3. Execute each tool call
+                for tool_call in tool_calls:
+                    if tool_call.function.name == "get_inventory_data":
+                        # Execute the function logic
+                        arguments = json.loads(tool_call.function.arguments)
                         inventory_data = self.get_inventory_data(arguments.get("query", ""))
                         
                         # 4. Provide function call results to the model
-                        input_list.append({
-                            "type": "function_call_output",
-                            "call_id": item.call_id,
-                            "output": json.dumps({
-                                "inventory_data": inventory_data
-                            })
+                        messages.append({
+                            "role": "tool",
+                            "tool_call_id": tool_call.id,
+                            "content": json.dumps(inventory_data)
                         })
-            
-            # 5. Get final response with structured output after tool calling
-            final_response = self.client.responses.parse(
-                model="gpt-4.1-mini",
-                instructions="Generate a complete quotation using the inventory data provided by the tool.",
-                tools=self.tools,
-                input=input_list,
-                text_format=FinalQuotation,
-            )
-            
-            quotation = final_response.output_parsed
+                
+                # 5. Get final response with tool results
+                final_response = self.client.beta.chat.completions.parse(
+                    model="gpt-4o-mini",
+                    messages=messages,
+                    response_format=FinalQuotation,
+                )
+                
+                quotation = final_response.choices[0].message.parsed
+            else:
+                # No tool calls, parse the response directly
+                final_response = self.client.beta.chat.completions.parse(
+                    model="gpt-4o-mini",
+                    messages=messages,
+                    response_format=FinalQuotation,
+                )
+                
+                quotation = final_response.choices[0].message.parsed
             
             return quotation
         
@@ -142,13 +194,13 @@ class Generator:
                 {"role": "user", "content": user_input}
             ]
             
-            response = self.client.responses.parse(
-                model="gpt-4.1-mini",
-                input=messages,
-                text_format=FinalQuotation,
+            response = self.client.beta.chat.completions.parse(
+                model="gpt-4o-mini",
+                messages=messages,
+                response_format=FinalQuotation,
             )
             
-            quotation = response.output_parsed
+            quotation = response.choices[0].message.parsed
             
             return quotation
         
