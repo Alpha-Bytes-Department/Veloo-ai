@@ -371,3 +371,17 @@ class Generator:
         
         except Exception as e:
             raise Exception(f"Error generating acceptance email content: {str(e)}")
+        
+
+    def generate_custom_email(self, offer: Dict) -> EmailResponse:
+        try:
+            Customer_name = offer.get("customer_name", "Valued Customer")
+            Subject = ""
+            Body = ""
+            return EmailResponse(
+                customer_name=Customer_name,
+                email_subject=Subject,
+                email_body=Body
+            )
+        except Exception as e:
+            raise Exception(f"Error generating custom mail: {str(e)}")
