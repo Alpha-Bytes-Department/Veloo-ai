@@ -379,6 +379,25 @@ async def generate_email_for_acceptance(request: EmailRequest):
         raise
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
+    
+@app.post("/email-custom", response_model=EmailResponse)
+async def generate_email_for_acceptance(request: EmailRequest):
+    """Generate email content for a customer based on offer ID"""
+    try:
+        # First, fetch the offer from the database
+        offer = database.get_offer_by_id(request.offer_id)
+        if not offer:
+            raise HTTPException(status_code=404, detail="Offer not found")
+        
+        # Generate email content using AI
+        email_response = generator.generate_custom_email(offer)
+        
+        return email_response
+    
+    except HTTPException:
+        raise
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
 
 if __name__ == "__main__":
     import uvicorn
