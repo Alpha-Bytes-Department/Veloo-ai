@@ -240,7 +240,7 @@ async def create_inventory_item(item: InventoryItem):
 async def get_all_inventory(
     limit: Optional[int] = 100,
     offset: Optional[int] = 0,
-    is_active: Optional[bool] = None,
+    active: Optional[bool] = None,
     category: Optional[str] = None
 ):
     """Get all inventory items with optional filters and pagination"""
@@ -248,7 +248,7 @@ async def get_all_inventory(
         items = database.get_all_inventory_items(
             limit=limit, 
             offset=offset, 
-            is_active=is_active,
+            active=active,
             category=category
         )
         return items
@@ -316,7 +316,7 @@ async def search_inventory(search_query: InventorySearchQuery):
         items = database.search_inventory_items(
             search_term=search_query.query,
             category=search_query.category,
-            is_active=search_query.is_active,
+            active=search_query.active,
             limit=100
         )
         return items
@@ -333,10 +333,10 @@ async def get_inventory_by_category(category: str):
         raise HTTPException(status_code=500, detail=str(e))
 
 @app.get("/inventory/stats/count")
-async def get_inventory_count(is_active: Optional[bool] = None):
+async def get_inventory_count(active: Optional[bool] = None):
     """Get total count of inventory items"""
     try:
-        count = database.get_inventory_count(is_active=is_active)
+        count = database.get_inventory_count(active=active)
         return {"total_items": count}
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))

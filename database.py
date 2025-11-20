@@ -1,111 +1,171 @@
-import pymongo
-from pymongo import MongoClient
+import psycopg2
+from psycopg2.extras import RealDictCursor, Json
 from typing import List, Optional, Dict
 from datetime import datetime
-from bson import ObjectId
 import os
 from dotenv import load_dotenv
 from schema import Finaloffer, InventoryItem
+import json
 
 # Load environment variables
 load_dotenv()
 
 class Database:
     def __init__(self):
-        # Get MongoDB connection string from environment variable
-        self.connection_string = os.getenv("MONGODB_URI", "mongodb://localhost:27017/")
-        self.database_name = os.getenv("DATABASE_NAME", "offer_db")
-        self.collection_name = "offers"
-        self.inventory_collection_name = "inventory"
-        
-        # Initialize MongoDB client
-        self.client = None
-        self.db = None
-        self.collection = None
-        self.inventory_collection = None
+        # Get PostgreSQL connection string from environment variable
+        self.connection_string = os.getenv("DATABASE_URL")
+        self.conn = None
+        self.cursor = None
         
     def connect(self):
-        """Establish connection to MongoDB"""
+        """Establish connection to PostgreSQL"""
         try:
-            self.client = MongoClient(self.connection_string)
-            self.db = self.client[self.database_name]
-            self.collection = self.db[self.collection_name]
-            self.inventory_collection = self.db[self.inventory_collection_name]
-            
-            # Test the connection
-            self.client.admin.command('ping')
-            print("Successfully connected to MongoDB")
+            self.conn = psycopg2.connect(self.connection_string)
+            self.cursor = self.conn.cursor(cursor_factory=RealDictCursor)
+            print("Successfully connected to PostgreSQL")
             
         except Exception as e:
-            print(f"Error connecting to MongoDB: {e}")
+            print(f"Error connecting to PostgreSQL: {e}")
             raise
     
     def disconnect(self):
-        """Close MongoDB connection"""
-        if self.client:
-            self.client.close()
+        """Close PostgreSQL connection"""
+        if self.cursor:
+            self.cursor.close()
+        if self.conn:
+            self.conn.close()
     
     def init_db(self):
-        """Initialize the database with required indexes"""
+        """Initialize the database with required tables"""
         try:
             self.connect()
             
-            # Create indexes for offers collection
-            self.collection.create_index([("customer_name", 1)])
-            self.collection.create_index([("phone_number", 1)])
-            self.collection.create_index([("created_at", -1)])
-            self.collection.create_index([("timestamp", -1)])
+            # Create offers table
+            self.cursor.execute("""
+                CREATE TABLE IF NOT EXISTS offers (
+                    id SERIAL PRIMARY KEY,
+                    customer_name TEXT NOT NULL,
+                    phone_number TEXT NOT NULL,
+                    address TEXT NOT NULL,
+                    task_description TEXT,
+                    bill_of_materials JSONB,
+                    time TEXT,
+                    price JSONB,
+                    timestamp TIMESTAMP,
+                    materials_ordered BOOLEAN DEFAULT FALSE,
+                    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+                )
+            """)
             
-            # Create indexes for inventory collection
-            self.inventory_collection.create_index([("name", 1)])
-            self.inventory_collection.create_index([("category", 1)])
-            self.inventory_collection.create_index([("sku", 1)], unique=True, sparse=True)
-            self.inventory_collection.create_index([("is_active", 1)])
-            self.inventory_collection.create_index([("created_at", -1)])
+            # Create indexes for offers
+            self.cursor.execute("""
+                CREATE INDEX IF NOT EXISTS idx_offers_customer_name ON offers(customer_name);
+            """)
+            self.cursor.execute("""
+                CREATE INDEX IF NOT EXISTS idx_offers_phone_number ON offers(phone_number);
+            """)
+            self.cursor.execute("""
+                CREATE INDEX IF NOT EXISTS idx_offers_created_at ON offers(created_at DESC);
+            """)
             
-            print("Database initialized successfully with indexes")
+            # Create inventory table
+            self.cursor.execute("""
+                CREATE TABLE IF NOT EXISTS inventory (
+                    id SERIAL PRIMARY KEY,
+                    name TEXT NOT NULL,
+                    category TEXT NOT NULL,
+                    description TEXT,
+                    brand TEXT,
+                    default_price DECIMAL(10, 2) NOT NULL,
+                    active BOOLEAN DEFAULT TRUE,
+                    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+                )
+            """)
+            
+            # Create indexes for inventory
+            self.cursor.execute("""
+                CREATE INDEX IF NOT EXISTS idx_inventory_name ON inventory(name);
+            """)
+            self.cursor.execute("""
+                CREATE INDEX IF NOT EXISTS idx_inventory_category ON inventory(category);
+            """)
+            self.cursor.execute("""
+                CREATE INDEX IF NOT EXISTS idx_inventory_brand ON inventory(brand);
+            """)
+            self.cursor.execute("""
+                CREATE INDEX IF NOT EXISTS idx_inventory_active ON inventory(active);
+            """)
+            self.cursor.execute("""
+                CREATE INDEX IF NOT EXISTS idx_inventory_created_at ON inventory(created_at DESC);
+            """)
+            
+            self.conn.commit()
+            print("Database initialized successfully with tables and indexes")
             
         except Exception as e:
+            if self.conn:
+                self.conn.rollback()
             print(f"Error initializing database: {e}")
             raise
     
     def save_offer(self, offer: Finaloffer) -> str:
-        """Save a offer to the database"""
+        """Save an offer to the database"""
         try:
-            if self.collection is None:
+            if self.conn is None:
                 self.connect()
             
             # Convert Pydantic model to dict
             offer_dict = offer.dict()
             
             # Add timestamps
-            offer_dict["created_at"] = datetime.now()
-            if not offer_dict.get("timestamp"):
-                offer_dict["timestamp"] = datetime.now()
+            created_at = datetime.now()
+            timestamp = offer_dict.get("timestamp") or datetime.now()
             
-            # Insert into MongoDB
-            result = self.collection.insert_one(offer_dict)
-            return str(result.inserted_id)
+            self.cursor.execute("""
+                INSERT INTO offers (
+                    customer_name, phone_number, address, task_description,
+                    bill_of_materials, time, price, timestamp, materials_ordered, created_at
+                )
+                VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
+                RETURNING id
+            """, (
+                offer_dict["customer_name"],
+                offer_dict["phone_number"],
+                offer_dict["address"],
+                offer_dict["task_description"],
+                Json(offer_dict["bill_of_materials"]),
+                offer_dict["time"],
+                Json(offer_dict["price"]),
+                timestamp,
+                offer_dict.get("materials_ordered", False),
+                created_at
+            ))
+            
+            offer_id = self.cursor.fetchone()["id"]
+            self.conn.commit()
+            return str(offer_id)
             
         except Exception as e:
+            if self.conn:
+                self.conn.rollback()
             raise Exception(f"Error saving offer: {e}")
     
     def get_offer_by_id(self, offer_id: str) -> Optional[Dict]:
-        """Get a offer by its ID"""
+        """Get an offer by its ID"""
         try:
-            if self.collection is None:
+            if self.conn is None:
                 self.connect()
             
-            # Convert string ID to ObjectId
-            object_id = ObjectId(offer_id)
+            self.cursor.execute("""
+                SELECT * FROM offers WHERE id = %s
+            """, (offer_id,))
             
-            offer = self.collection.find_one({"_id": object_id})
+            offer = self.cursor.fetchone()
             
             if offer:
-                # Convert ObjectId to string for JSON serialization
-                offer["id"] = str(offer["_id"])
-                del offer["_id"]
-                return offer
+                return dict(offer)
             return None
             
         except Exception as e:
@@ -114,20 +174,17 @@ class Database:
     def get_all_offers(self, limit: int = 100, offset: int = 0) -> List[Dict]:
         """Get all offers with pagination"""
         try:
-            if self.collection is None:
+            if self.conn is None:
                 self.connect()
             
-            # Use MongoDB's skip and limit for pagination
-            cursor = self.collection.find().sort("created_at", -1).skip(offset).limit(limit)
+            self.cursor.execute("""
+                SELECT * FROM offers 
+                ORDER BY created_at DESC 
+                LIMIT %s OFFSET %s
+            """, (limit, offset))
             
-            offers = []
-            for doc in cursor:
-                # Convert ObjectId to string
-                doc["id"] = str(doc["_id"])
-                del doc["_id"]
-                offers.append(doc)
-            
-            return offers
+            offers = self.cursor.fetchall()
+            return [dict(offer) for offer in offers]
             
         except Exception as e:
             raise Exception(f"Error fetching offers: {e}")
@@ -135,73 +192,97 @@ class Database:
     def get_offers_by_customer(self, customer_name: str) -> List[Dict]:
         """Get all offers for a specific customer"""
         try:
-            if self.collection is None:
+            if self.conn is None:
                 self.connect()
             
-            # Use regex for case-insensitive partial matching
-            query = {"customer_name": {"$regex": customer_name, "$options": "i"}}
-            cursor = self.collection.find(query).sort("created_at", -1)
+            self.cursor.execute("""
+                SELECT * FROM offers 
+                WHERE customer_name ILIKE %s 
+                ORDER BY created_at DESC
+            """, (f"%{customer_name}%",))
             
-            offers = []
-            for doc in cursor:
-                # Convert ObjectId to string
-                doc["id"] = str(doc["_id"])
-                del doc["_id"]
-                offers.append(doc)
-            
-            return offers
+            offers = self.cursor.fetchall()
+            return [dict(offer) for offer in offers]
             
         except Exception as e:
             raise Exception(f"Error fetching customer offers: {e}")
     
     def delete_offer(self, offer_id: str) -> bool:
-        """Delete a offer by ID"""
+        """Delete an offer by ID"""
         try:
-            if self.collection is None:
+            if self.conn is None:
                 self.connect()
             
-            # Convert string ID to ObjectId
-            object_id = ObjectId(offer_id)
+            self.cursor.execute("""
+                DELETE FROM offers WHERE id = %s
+            """, (offer_id,))
             
-            result = self.collection.delete_one({"_id": object_id})
-            return result.deleted_count > 0
+            deleted = self.cursor.rowcount > 0
+            self.conn.commit()
+            return deleted
                 
         except Exception as e:
+            if self.conn:
+                self.conn.rollback()
             raise Exception(f"Error deleting offer: {e}")
     
     def update_offer(self, offer_id: str, offer: Finaloffer) -> bool:
         """Update an existing offer"""
         try:
-            if self.collection is None:
+            if self.conn is None:
                 self.connect()
-            
-            # Convert string ID to ObjectId
-            object_id = ObjectId(offer_id)
             
             # Convert Pydantic model to dict
             update_data = offer.dict()
             
-            # Update timestamp
-            update_data["timestamp"] = offer.timestamp or datetime.now()
-            update_data["updated_at"] = datetime.now()
+            timestamp = update_data.get("timestamp") or datetime.now()
+            updated_at = datetime.now()
             
-            result = self.collection.update_one(
-                {"_id": object_id},
-                {"$set": update_data}
-            )
+            self.cursor.execute("""
+                UPDATE offers SET
+                    customer_name = %s,
+                    phone_number = %s,
+                    address = %s,
+                    task_description = %s,
+                    bill_of_materials = %s,
+                    time = %s,
+                    price = %s,
+                    timestamp = %s,
+                    materials_ordered = %s,
+                    updated_at = %s
+                WHERE id = %s
+            """, (
+                update_data["customer_name"],
+                update_data["phone_number"],
+                update_data["address"],
+                update_data["task_description"],
+                Json(update_data["bill_of_materials"]),
+                update_data["time"],
+                Json(update_data["price"]),
+                timestamp,
+                update_data.get("materials_ordered", False),
+                updated_at,
+                offer_id
+            ))
             
-            return result.modified_count > 0
+            modified = self.cursor.rowcount > 0
+            self.conn.commit()
+            return modified
                 
         except Exception as e:
+            if self.conn:
+                self.conn.rollback()
             raise Exception(f"Error updating offer: {e}")
     
     def get_offers_count(self) -> int:
         """Get total count of offers"""
         try:
-            if self.collection is None:
+            if self.conn is None:
                 self.connect()
             
-            return self.collection.count_documents({})
+            self.cursor.execute("SELECT COUNT(*) as count FROM offers")
+            result = self.cursor.fetchone()
+            return result["count"]
             
         except Exception as e:
             raise Exception(f"Error counting offers: {e}")
@@ -209,73 +290,65 @@ class Database:
     def search_offers(self, search_term: str, limit: int = 100) -> List[Dict]:
         """Search offers by text across multiple fields"""
         try:
-            if self.collection is None:
+            if self.conn is None:
                 self.connect()
             
-            # Create text search query
-            query = {
-                "$or": [
-                    {"customer_name": {"$regex": search_term, "$options": "i"}},
-                    {"phone_number": {"$regex": search_term, "$options": "i"}},
-                    {"address": {"$regex": search_term, "$options": "i"}},
-                    {"task_description": {"$regex": search_term, "$options": "i"}},
-                    {"bill_of_materials": {"$regex": search_term, "$options": "i"}}
-                ]
-            }
+            search_pattern = f"%{search_term}%"
             
-            cursor = self.collection.find(query).sort("created_at", -1).limit(limit)
+            self.cursor.execute("""
+                SELECT * FROM offers 
+                WHERE customer_name ILIKE %s 
+                   OR phone_number ILIKE %s 
+                   OR address ILIKE %s 
+                   OR task_description ILIKE %s
+                ORDER BY created_at DESC 
+                LIMIT %s
+            """, (search_pattern, search_pattern, search_pattern, search_pattern, limit))
             
-            offers = []
-            for doc in cursor:
-                # Convert ObjectId to string
-                doc["id"] = str(doc["_id"])
-                del doc["_id"]
-                offers.append(doc)
-            
-            return offers
+            offers = self.cursor.fetchall()
+            return [dict(offer) for offer in offers]
             
         except Exception as e:
             raise Exception(f"Error searching offers: {e}")
     
     def toggle_materials_ordered(self, offer_id: str) -> Dict:
-        """Toggle the materials_ordered status of a offer"""
+        """Toggle the materials_ordered status of an offer"""
         try:
-            if self.collection is None:
+            if self.conn is None:
                 self.connect()
             
-            # Convert string ID to ObjectId
-            object_id = ObjectId(offer_id)
-            
             # Get current offer
-            offer = self.collection.find_one({"_id": object_id})
+            self.cursor.execute("""
+                SELECT materials_ordered FROM offers WHERE id = %s
+            """, (offer_id,))
+            
+            offer = self.cursor.fetchone()
             if not offer:
                 raise Exception("offer not found")
             
             # Toggle the materials_ordered status
-            current_status = offer.get("materials_ordered", False)
+            current_status = offer["materials_ordered"]
             new_status = not current_status
             
             # Update the offer
-            result = self.collection.update_one(
-                {"_id": object_id},
-                {
-                    "$set": {
-                        "materials_ordered": new_status,
-                        "updated_at": datetime.now()
-                    }
-                }
-            )
+            self.cursor.execute("""
+                UPDATE offers SET 
+                    materials_ordered = %s,
+                    updated_at = %s
+                WHERE id = %s
+            """, (new_status, datetime.now(), offer_id))
             
-            if result.modified_count > 0:
-                return {
-                    "success": True,
-                    "offer_id": offer_id,
-                    "materials_ordered": new_status
-                }
-            else:
-                raise Exception("Failed to update offer")
+            self.conn.commit()
+            
+            return {
+                "success": True,
+                "offer_id": offer_id,
+                "materials_ordered": new_status
+            }
                 
         except Exception as e:
+            if self.conn:
+                self.conn.rollback()
             raise Exception(f"Error toggling materials_ordered status: {e}")
 
     # ==================== INVENTORY MANAGEMENT METHODS ====================
@@ -283,39 +356,52 @@ class Database:
     def create_inventory_item(self, item: InventoryItem) -> str:
         """Create a new inventory item"""
         try:
-            if self.inventory_collection is None:
+            if self.conn is None:
                 self.connect()
             
             # Convert Pydantic model to dict
-            item_dict = item.dict()
+            item_dict = item.dict(exclude={'id'})
             
-            # Add timestamps
-            item_dict["created_at"] = datetime.now()
-            item_dict["updated_at"] = datetime.now()
+            self.cursor.execute("""
+                INSERT INTO inventory (
+                    name, category, description, brand, default_price, active, created_at, updated_at
+                )
+                VALUES (%s, %s, %s, %s, %s, %s, %s, %s)
+                RETURNING id
+            """, (
+                item_dict["name"],
+                item_dict["category"],
+                item_dict.get("description"),
+                item_dict.get("brand"),
+                item_dict["default_price"],
+                item_dict.get("active", True),
+                datetime.now(),
+                datetime.now()
+            ))
             
-            # Insert into MongoDB
-            result = self.inventory_collection.insert_one(item_dict)
-            return str(result.inserted_id)
+            item_id = self.cursor.fetchone()["id"]
+            self.conn.commit()
+            return str(item_id)
             
         except Exception as e:
+            if self.conn:
+                self.conn.rollback()
             raise Exception(f"Error creating inventory item: {e}")
     
     def get_inventory_item_by_id(self, item_id: str) -> Optional[Dict]:
         """Get an inventory item by its ID"""
         try:
-            if self.inventory_collection is None:
+            if self.conn is None:
                 self.connect()
             
-            # Convert string ID to ObjectId
-            object_id = ObjectId(item_id)
+            self.cursor.execute("""
+                SELECT * FROM inventory WHERE id = %s
+            """, (item_id,))
             
-            item = self.inventory_collection.find_one({"_id": object_id})
+            item = self.cursor.fetchone()
             
             if item:
-                # Convert ObjectId to string for JSON serialization
-                item["id"] = str(item["_id"])
-                del item["_id"]
-                return item
+                return dict(item)
             return None
             
         except Exception as e:
@@ -324,31 +410,38 @@ class Database:
     def get_all_inventory_items(self, 
                                  limit: int = 100, 
                                  offset: int = 0,
-                                 is_active: Optional[bool] = None,
+                                 active: Optional[bool] = None,
                                  category: Optional[str] = None) -> List[Dict]:
         """Get all inventory items with optional filters and pagination"""
         try:
-            if self.inventory_collection is None:
+            if self.conn is None:
                 self.connect()
             
-            # Build query filter
-            query = {}
-            if is_active is not None:
-                query["is_active"] = is_active
+            # Build query with filters
+            conditions = []
+            params = []
+            
+            if active is not None:
+                conditions.append("active = %s")
+                params.append(active)
+            
             if category:
-                query["category"] = {"$regex": category, "$options": "i"}
+                conditions.append("category ILIKE %s")
+                params.append(f"%{category}%")
             
-            # Use MongoDB's skip and limit for pagination
-            cursor = self.inventory_collection.find(query).sort("created_at", -1).skip(offset).limit(limit)
+            where_clause = "WHERE " + " AND ".join(conditions) if conditions else ""
             
-            items = []
-            for doc in cursor:
-                # Convert ObjectId to string
-                doc["id"] = str(doc["_id"])
-                del doc["_id"]
-                items.append(doc)
+            params.extend([limit, offset])
             
-            return items
+            self.cursor.execute(f"""
+                SELECT * FROM inventory 
+                {where_clause}
+                ORDER BY created_at DESC 
+                LIMIT %s OFFSET %s
+            """, params)
+            
+            items = self.cursor.fetchall()
+            return [dict(item) for item in items]
             
         except Exception as e:
             raise Exception(f"Error fetching inventory items: {e}")
@@ -356,98 +449,122 @@ class Database:
     def update_inventory_item(self, item_id: str, update_data: Dict) -> bool:
         """Update an existing inventory item"""
         try:
-            if self.inventory_collection is None:
+            if self.conn is None:
                 self.connect()
-            
-            # Convert string ID to ObjectId
-            object_id = ObjectId(item_id)
             
             # Remove None values from update data
             update_data = {k: v for k, v in update_data.items() if v is not None}
             
-            # Update timestamp
-            update_data["updated_at"] = datetime.now()
+            if not update_data:
+                return False
             
-            result = self.inventory_collection.update_one(
-                {"_id": object_id},
-                {"$set": update_data}
-            )
+            # Build SET clause dynamically
+            set_clauses = []
+            params = []
             
-            return result.modified_count > 0
+            for key, value in update_data.items():
+                set_clauses.append(f"{key} = %s")
+                params.append(value)
+            
+            # Add updated_at
+            set_clauses.append("updated_at = %s")
+            params.append(datetime.now())
+            
+            # Add item_id as last parameter
+            params.append(item_id)
+            
+            query = f"""
+                UPDATE inventory SET {', '.join(set_clauses)}
+                WHERE id = %s
+            """
+            
+            self.cursor.execute(query, params)
+            
+            modified = self.cursor.rowcount > 0
+            self.conn.commit()
+            return modified
                 
         except Exception as e:
+            if self.conn:
+                self.conn.rollback()
             raise Exception(f"Error updating inventory item: {e}")
     
     def delete_inventory_item(self, item_id: str) -> bool:
         """Delete an inventory item by ID"""
         try:
-            if self.inventory_collection is None:
+            if self.conn is None:
                 self.connect()
             
-            # Convert string ID to ObjectId
-            object_id = ObjectId(item_id)
+            self.cursor.execute("""
+                DELETE FROM inventory WHERE id = %s
+            """, (item_id,))
             
-            result = self.inventory_collection.delete_one({"_id": object_id})
-            return result.deleted_count > 0
+            deleted = self.cursor.rowcount > 0
+            self.conn.commit()
+            return deleted
                 
         except Exception as e:
+            if self.conn:
+                self.conn.rollback()
             raise Exception(f"Error deleting inventory item: {e}")
     
     def search_inventory_items(self, 
                                search_term: str, 
                                category: Optional[str] = None,
-                               is_active: bool = True,
+                               active: bool = True,
                                limit: int = 100) -> List[Dict]:
         """Search inventory items by text across multiple fields"""
         try:
-            if self.inventory_collection is None:
+            if self.conn is None:
                 self.connect()
             
-            # Create search query
-            search_conditions = [
-                {"name": {"$regex": search_term, "$options": "i"}},
-                {"description": {"$regex": search_term, "$options": "i"}},
-                {"category": {"$regex": search_term, "$options": "i"}},
-                {"supplier": {"$regex": search_term, "$options": "i"}},
-                {"sku": {"$regex": search_term, "$options": "i"}}
-            ]
+            search_pattern = f"%{search_term}%"
             
             # Build query with filters
-            query = {
-                "$and": [
-                    {"$or": search_conditions},
-                    {"is_active": is_active}
-                ]
-            }
+            conditions = [
+                "(name ILIKE %s OR description ILIKE %s OR category ILIKE %s OR brand ILIKE %s)"
+            ]
+            params = [search_pattern, search_pattern, search_pattern, search_pattern]
+            
+            conditions.append("active = %s")
+            params.append(active)
             
             if category:
-                query["$and"].append({"category": {"$regex": category, "$options": "i"}})
+                conditions.append("category ILIKE %s")
+                params.append(f"%{category}%")
             
-            cursor = self.inventory_collection.find(query).sort("created_at", -1).limit(limit)
+            params.append(limit)
             
-            items = []
-            for doc in cursor:
-                # Convert ObjectId to string
-                doc["id"] = str(doc["_id"])
-                del doc["_id"]
-                items.append(doc)
+            where_clause = " AND ".join(conditions)
             
-            return items
+            self.cursor.execute(f"""
+                SELECT * FROM inventory 
+                WHERE {where_clause}
+                ORDER BY created_at DESC 
+                LIMIT %s
+            """, params)
+            
+            items = self.cursor.fetchall()
+            return [dict(item) for item in items]
             
         except Exception as e:
             raise Exception(f"Error searching inventory items: {e}")
     
-    def get_inventory_count(self, is_active: Optional[bool] = None) -> int:
+    def get_inventory_count(self, active: Optional[bool] = None) -> int:
         """Get total count of inventory items"""
         try:
-            if self.inventory_collection is None:
+            if self.conn is None:
                 self.connect()
             
-            query = {}
-            if is_active is not None:
-                query["is_active"] = is_active
+            if active is not None:
+                self.cursor.execute("""
+                    SELECT COUNT(*) as count FROM inventory WHERE active = %s
+                """, (active,))
+            else:
+                self.cursor.execute("SELECT COUNT(*) as count FROM inventory")
             
-            return self.inventory_collection.count_documents(query)
+            result = self.cursor.fetchone()
+            return result["count"]
             
         except Exception as e:
             raise Exception(f"Error counting inventory items: {e}")
@@ -455,26 +572,19 @@ class Database:
     def get_inventory_by_category(self, category: str) -> List[Dict]:
         """Get all inventory items in a specific category"""
         try:
-            if self.inventory_collection is None:
+            if self.conn is None:
                 self.connect()
             
-            query = {
-                "category": {"$regex": category, "$options": "i"},
-                "is_active": True
-            }
+            self.cursor.execute("""
+                SELECT * FROM inventory 
+                WHERE category ILIKE %s AND active = TRUE
+                ORDER BY name ASC
+            """, (f"%{category}%",))
             
-            cursor = self.inventory_collection.find(query).sort("name", 1)
-            
-            items = []
-            for doc in cursor:
-                # Convert ObjectId to string
-                doc["id"] = str(doc["_id"])
-                del doc["_id"]
-                items.append(doc)
-            
-            return items
+            items = self.cursor.fetchall()
+            return [dict(item) for item in items]
             
         except Exception as e:
             raise Exception(f"Error fetching inventory by category: {e}")
-    
-    
+
+
