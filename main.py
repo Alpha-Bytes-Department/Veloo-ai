@@ -6,14 +6,14 @@ from contextlib import asynccontextmanager
 import json
 
 from schema import (
-    QuotationRequest, 
-    FinalQuotation, 
-    UpdateQuotationRequest,
+    offerRequest, 
+    Finaloffer, 
+    UpdateofferRequest,
     InventoryItem,
     InventoryItemUpdate,
     InventorySearchQuery
 )
-from quotation import Generator
+from offer import Generator
 from database import Database
 
 # Initialize components
@@ -31,8 +31,8 @@ async def lifespan(app: FastAPI):
 
 # Initialize FastAPI app
 app = FastAPI(
-    title="Quotation Generator API",
-    description="AI-powered quotation generation service",
+    title="Offer Generator API",
+    description="AI-powered offer generation service",
     version="1.0.0",
     lifespan=lifespan
 )
@@ -52,142 +52,142 @@ async def health_check():
     """Health check endpoint"""
     return {"status": "healthy", "timestamp": datetime.now()}
 
-@app.post("/quotations/generate", response_model=FinalQuotation)
-async def generate_quotation(request: QuotationRequest):
-    """Generate a new quotation using AI"""
+@app.post("/offers/generate", response_model=Finaloffer)
+async def generate_offer(request: offerRequest):
+    """Generate a new offer using AI"""
     try:
-        # Generate quotation using AI
-        quotation = generator.generate_quotation(request)
+        # Generate offer using AI
+        offer = generator.generate_offer(request)
         
         # Save to database
-        quotation_id = database.save_quotation(quotation)
+        offer_id = database.save_offer(offer)
         
         # Add the ID to the response
-        quotation_dict = quotation.dict()
-        quotation_dict["id"] = quotation_id
+        offer_dict = offer.dict()
+        offer_dict["id"] = offer_id
         
-        return quotation_dict
+        return offer_dict
     
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
 
-@app.post("/quotations/save", response_model=dict)
-async def save_quotation(quotation: FinalQuotation):
-    """Save a final quotation directly to the database"""
+@app.post("/offers/save", response_model=dict)
+async def save_offer(offer: Finaloffer):
+    """Save a final offer directly to the database"""
     try:
-        # Save the quotation to database
-        quotation_id = database.save_quotation(quotation)
+        # Save the offer to database
+        offer_id = database.save_offer(offer)
         
-        # Return the saved quotation with its ID
-        quotation_dict = quotation.dict()
-        quotation_dict["id"] = quotation_id
+        # Return the saved offer with its ID
+        offer_dict = offer.dict()
+        offer_dict["id"] = offer_id
         
         return {
-            "message": "Quotation saved successfully",
-            "quotation_id": quotation_id,
-            "quotation": quotation_dict
+            "message": "offer saved successfully",
+            "offer_id": offer_id,
+            "offer": offer_dict
         }
     
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
 
-@app.get("/quotations", response_model=List[dict])
-async def get_all_quotations(
+@app.get("/offers", response_model=List[dict])
+async def get_all_offers(
     limit: Optional[int] = 100,
     offset: Optional[int] = 0
 ):
-    """Get all quotations with pagination"""
+    """Get all offers with pagination"""
     try:
-        quotations = database.get_all_quotations(limit=limit, offset=offset)
-        return quotations
+        offers = database.get_all_offers(limit=limit, offset=offset)
+        return offers
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
 
-@app.get("/quotations/{quotation_id}")
-async def get_quotation(quotation_id: str):
-    """Get a specific quotation by ID"""
+@app.get("/offers/{offer_id}")
+async def get_offer(offer_id: str):
+    """Get a specific offer by ID"""
     try:
-        quotation = database.get_quotation_by_id(quotation_id)
-        if not quotation:
-            raise HTTPException(status_code=404, detail="Quotation not found")
-        return quotation
+        offer = database.get_offer_by_id(offer_id)
+        if not offer:
+            raise HTTPException(status_code=404, detail="offer not found")
+        return offer
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
 
-@app.delete("/quotations/{quotation_id}")
-async def delete_quotation(quotation_id: str): 
-    """Delete a specific quotation"""
+@app.delete("/offers/{offer_id}")
+async def delete_offer(offer_id: str): 
+    """Delete a specific offer"""
     try:
-        success = database.delete_quotation(quotation_id)
+        success = database.delete_offer(offer_id)
         if not success:
-            raise HTTPException(status_code=404, detail="Quotation not found")
-        return {"message": "Quotation deleted successfully"}
+            raise HTTPException(status_code=404, detail="offer not found")
+        return {"message": "offer deleted successfully"}
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
 
-@app.get("/quotations/customer/{customer_name}")
-async def get_quotations_by_customer(customer_name: str):
-    """Get all quotations for a specific customer"""
+@app.get("/offers/customer/{customer_name}")
+async def get_offers_by_customer(customer_name: str):
+    """Get all offers for a specific customer"""
     try:
-        quotations = database.get_quotations_by_customer(customer_name)
-        return quotations
+        offers = database.get_offers_by_customer(customer_name)
+        return offers
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
 
-@app.get("/quotations/search/{search_term}")
-async def search_quotations(search_term: str, limit: Optional[int] = 100):
-    """Search quotations by text across multiple fields"""
+@app.get("/offers/search/{search_term}")
+async def search_offers(search_term: str, limit: Optional[int] = 100):
+    """Search offers by text across multiple fields"""
     try:
-        quotations = database.search_quotations(search_term, limit)
-        return quotations
+        offers = database.search_offers(search_term, limit)
+        return offers
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
 
-@app.get("/quotations/count")
-async def get_quotations_count():
-    """Get total count of quotations"""
+@app.get("/offers/count")
+async def get_offers_count():
+    """Get total count of offers"""
     try:
-        count = database.get_quotations_count()
-        return {"total_quotations": count}
+        count = database.get_offers_count()
+        return {"total_offers": count}
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
 
-@app.put("/quotations/update", response_model=dict)
-async def update_quotation(request: UpdateQuotationRequest):
-    """Update an existing quotation by ID using AI and save to database"""
+@app.put("/offers/update", response_model=dict)
+async def update_offer(request: UpdateofferRequest):
+    """Update an existing offer by ID using AI and save to database"""
     try:
-        # First check if quotation exists
-        existing_quotation = database.get_quotation_by_id(request.quotation_id)
-        if not existing_quotation:
-            raise HTTPException(status_code=404, detail="Quotation not found")
+        # First check if offer exists
+        existing_offer = database.get_offer_by_id(request.offer_id)
+        if not existing_offer:
+            raise HTTPException(status_code=404, detail="offer not found")
         
-        # Convert the database result to FinalQuotation object
-        existing_final_quotation = FinalQuotation(
-            customer_name=existing_quotation.get("customer_name", ""),
-            phone_number=existing_quotation.get("phone_number", ""),
-            address=existing_quotation.get("address", ""),
-            task_description=existing_quotation.get("task_description", ""),
-            bill_of_materials=existing_quotation.get("bill_of_materials", ""),
-            time=existing_quotation.get("time", ""),
-            price=existing_quotation.get("price", ""),
-            timestamp=existing_quotation.get("timestamp"),
-            materials_ordered=existing_quotation.get("materials_ordered", False)
+        # Convert the database result to Finaloffer object
+        existing_final_offer = Finaloffer(
+            customer_name=existing_offer.get("customer_name", ""),
+            phone_number=existing_offer.get("phone_number", ""),
+            address=existing_offer.get("address", ""),
+            task_description=existing_offer.get("task_description", ""),
+            bill_of_materials=existing_offer.get("bill_of_materials", ""),
+            time=existing_offer.get("time", ""),
+            price=existing_offer.get("price", ""),
+            timestamp=existing_offer.get("timestamp"),
+            materials_ordered=existing_offer.get("materials_ordered", False)
         )
         
-        # Use the generator's update_quotation method
-        updated_quotation = generator.update_quotation(
+        # Use the generator's update_offer method
+        updated_offer = generator.update_offer(
             user_message=request.user_message,
-            update_request=existing_final_quotation
+            update_request=existing_final_offer
         )
         
-        # Save the updated quotation to database
-        success = database.update_quotation(request.quotation_id, updated_quotation)
+        # Save the updated offer to database
+        success = database.update_offer(request.offer_id, updated_offer)
         if not success:
-            raise HTTPException(status_code=500, detail="Failed to update quotation in database")
+            raise HTTPException(status_code=500, detail="Failed to update offer in database")
         
-        # Return the updated quotation with ID
-        result = updated_quotation.dict()
-        result["id"] = request.quotation_id
+        # Return the updated offer with ID
+        result = updated_offer.dict()
+        result["id"] = request.offer_id
         
         return result
     
@@ -196,19 +196,19 @@ async def update_quotation(request: UpdateQuotationRequest):
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
 
-@app.put("/quotations/{quotation_id}/materials-ordered")
-async def toggle_materials_ordered(quotation_id: str):
-    """Toggle the materials_ordered status of a quotation"""
+@app.put("/offers/{offer_id}/materials-ordered")
+async def toggle_materials_ordered(offer_id: str):
+    """Toggle the materials_ordered status of a offer"""
     try:
-        result = database.toggle_materials_ordered(quotation_id)
+        result = database.toggle_materials_ordered(offer_id)
         return {
             "message": "Materials ordered status toggled successfully",
-            "quotation_id": result["quotation_id"],
+            "offer_id": result["offer_id"],
             "materials_ordered": result["materials_ordered"]
         }
     except Exception as e:
         if "not found" in str(e).lower():
-            raise HTTPException(status_code=404, detail="Quotation not found")
+            raise HTTPException(status_code=404, detail="offer not found")
         raise HTTPException(status_code=500, detail=str(e))
 
 
