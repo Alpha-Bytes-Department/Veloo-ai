@@ -17,10 +17,12 @@ from schema import (
 )
 from generator import Generator
 from database import Database
+from email_manager import EmailManager
 
 # Initialize components
 database = Database()
 generator = Generator(database=database)  # Pass database instance to generator
+emailManager = EmailManager(database=database)  # Pass database instance to email manager
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
@@ -352,7 +354,7 @@ async def generate_email_for_offer(request: EmailRequest):
             raise HTTPException(status_code=404, detail="Offer not found")
         
         # Generate email content using AI
-        email_response = generator.generate_offer_email(offer)
+        email_response = emailManager.generate_offer_email(offer)
         
         return email_response
     
@@ -371,7 +373,7 @@ async def generate_email_for_acceptance(request: EmailRequest):
             raise HTTPException(status_code=404, detail="Offer not found")
         
         # Generate email content using AI
-        email_response = generator.generate_acceptance_email(offer)
+        email_response = emailManager.generate_acceptance_email(offer)
         
         return email_response
     
@@ -390,7 +392,7 @@ async def generate_email_for_acceptance(request: EmailRequest):
             raise HTTPException(status_code=404, detail="Offer not found")
         
         # Generate email content using AI
-        email_response = generator.generate_custom_email(offer)
+        email_response = emailManager.generate_custom_email(offer)
         
         return email_response
     
