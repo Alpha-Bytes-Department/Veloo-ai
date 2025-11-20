@@ -80,3 +80,10 @@ class EmailResponse(BaseModel):
     customer_name: str = Field(..., description="Name of the customer")
     email_subject: str = Field(..., description="Email subject line")
     email_body: str = Field(..., description="Email body content")
+
+class Email(BaseModel):
+    to: str = Field(..., description="Recipient email address")
+    subject: str = Field(..., description="Email subject line")
+    body: str = Field(..., description="Email body content")
+
+
