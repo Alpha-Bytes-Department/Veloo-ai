@@ -72,3 +72,11 @@ class InventorySearchQuery(BaseModel):
     query: str = Field(..., description="Search query for inventory items")
     category: Optional[str] = Field(None, description="Filter by category")
     is_active: Optional[bool] = Field(True, description="Filter by active status")
+
+class EmailRequest(BaseModel):
+    offer_id: str = Field(..., description="ID of the offer to generate email for")
+
+class EmailResponse(BaseModel):
+    customer_name: str = Field(..., description="Name of the customer")
+    email_subject: str = Field(..., description="Email subject line")
+    email_body: str = Field(..., description="Email body content")
