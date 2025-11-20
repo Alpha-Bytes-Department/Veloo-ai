@@ -5,7 +5,7 @@ from datetime import datetime
 from bson import ObjectId
 import os
 from dotenv import load_dotenv
-from schema import FinalQuotation, InventoryItem
+from schema import Finaloffer, InventoryItem
 
 # Load environment variables
 load_dotenv()
@@ -14,8 +14,8 @@ class Database:
     def __init__(self):
         # Get MongoDB connection string from environment variable
         self.connection_string = os.getenv("MONGODB_URI", "mongodb://localhost:27017/")
-        self.database_name = os.getenv("DATABASE_NAME", "quotation_db")
-        self.collection_name = "quotations"
+        self.database_name = os.getenv("DATABASE_NAME", "offer_db")
+        self.collection_name = "offers"
         self.inventory_collection_name = "inventory"
         
         # Initialize MongoDB client
@@ -50,7 +50,7 @@ class Database:
         try:
             self.connect()
             
-            # Create indexes for quotations collection
+            # Create indexes for offers collection
             self.collection.create_index([("customer_name", 1)])
             self.collection.create_index([("phone_number", 1)])
             self.collection.create_index([("created_at", -1)])
@@ -69,50 +69,50 @@ class Database:
             print(f"Error initializing database: {e}")
             raise
     
-    def save_quotation(self, quotation: FinalQuotation) -> str:
-        """Save a quotation to the database"""
+    def save_offer(self, offer: Finaloffer) -> str:
+        """Save a offer to the database"""
         try:
             if self.collection is None:
                 self.connect()
             
             # Convert Pydantic model to dict
-            quotation_dict = quotation.dict()
+            offer_dict = offer.dict()
             
             # Add timestamps
-            quotation_dict["created_at"] = datetime.now()
-            if not quotation_dict.get("timestamp"):
-                quotation_dict["timestamp"] = datetime.now()
+            offer_dict["created_at"] = datetime.now()
+            if not offer_dict.get("timestamp"):
+                offer_dict["timestamp"] = datetime.now()
             
             # Insert into MongoDB
-            result = self.collection.insert_one(quotation_dict)
+            result = self.collection.insert_one(offer_dict)
             return str(result.inserted_id)
             
         except Exception as e:
-            raise Exception(f"Error saving quotation: {e}")
+            raise Exception(f"Error saving offer: {e}")
     
-    def get_quotation_by_id(self, quotation_id: str) -> Optional[Dict]:
-        """Get a quotation by its ID"""
+    def get_offer_by_id(self, offer_id: str) -> Optional[Dict]:
+        """Get a offer by its ID"""
         try:
             if self.collection is None:
                 self.connect()
             
             # Convert string ID to ObjectId
-            object_id = ObjectId(quotation_id)
+            object_id = ObjectId(offer_id)
             
-            quotation = self.collection.find_one({"_id": object_id})
+            offer = self.collection.find_one({"_id": object_id})
             
-            if quotation:
+            if offer:
                 # Convert ObjectId to string for JSON serialization
-                quotation["id"] = str(quotation["_id"])
-                del quotation["_id"]
-                return quotation
+                offer["id"] = str(offer["_id"])
+                del offer["_id"]
+                return offer
             return None
             
         except Exception as e:
-            raise Exception(f"Error fetching quotation: {e}")
+            raise Exception(f"Error fetching offer: {e}")
     
-    def get_all_quotations(self, limit: int = 100, offset: int = 0) -> List[Dict]:
-        """Get all quotations with pagination"""
+    def get_all_offers(self, limit: int = 100, offset: int = 0) -> List[Dict]:
+        """Get all offers with pagination"""
         try:
             if self.collection is None:
                 self.connect()
@@ -120,20 +120,20 @@ class Database:
             # Use MongoDB's skip and limit for pagination
             cursor = self.collection.find().sort("created_at", -1).skip(offset).limit(limit)
             
-            quotations = []
+            offers = []
             for doc in cursor:
                 # Convert ObjectId to string
                 doc["id"] = str(doc["_id"])
                 del doc["_id"]
-                quotations.append(doc)
+                offers.append(doc)
             
-            return quotations
+            return offers
             
         except Exception as e:
-            raise Exception(f"Error fetching quotations: {e}")
+            raise Exception(f"Error fetching offers: {e}")
     
-    def get_quotations_by_customer(self, customer_name: str) -> List[Dict]:
-        """Get all quotations for a specific customer"""
+    def get_offers_by_customer(self, customer_name: str) -> List[Dict]:
+        """Get all offers for a specific customer"""
         try:
             if self.collection is None:
                 self.connect()
@@ -142,47 +142,47 @@ class Database:
             query = {"customer_name": {"$regex": customer_name, "$options": "i"}}
             cursor = self.collection.find(query).sort("created_at", -1)
             
-            quotations = []
+            offers = []
             for doc in cursor:
                 # Convert ObjectId to string
                 doc["id"] = str(doc["_id"])
                 del doc["_id"]
-                quotations.append(doc)
+                offers.append(doc)
             
-            return quotations
+            return offers
             
         except Exception as e:
-            raise Exception(f"Error fetching customer quotations: {e}")
+            raise Exception(f"Error fetching customer offers: {e}")
     
-    def delete_quotation(self, quotation_id: str) -> bool:
-        """Delete a quotation by ID"""
+    def delete_offer(self, offer_id: str) -> bool:
+        """Delete a offer by ID"""
         try:
             if self.collection is None:
                 self.connect()
             
             # Convert string ID to ObjectId
-            object_id = ObjectId(quotation_id)
+            object_id = ObjectId(offer_id)
             
             result = self.collection.delete_one({"_id": object_id})
             return result.deleted_count > 0
                 
         except Exception as e:
-            raise Exception(f"Error deleting quotation: {e}")
+            raise Exception(f"Error deleting offer: {e}")
     
-    def update_quotation(self, quotation_id: str, quotation: FinalQuotation) -> bool:
-        """Update an existing quotation"""
+    def update_offer(self, offer_id: str, offer: Finaloffer) -> bool:
+        """Update an existing offer"""
         try:
             if self.collection is None:
                 self.connect()
             
             # Convert string ID to ObjectId
-            object_id = ObjectId(quotation_id)
+            object_id = ObjectId(offer_id)
             
             # Convert Pydantic model to dict
-            update_data = quotation.dict()
+            update_data = offer.dict()
             
             # Update timestamp
-            update_data["timestamp"] = quotation.timestamp or datetime.now()
+            update_data["timestamp"] = offer.timestamp or datetime.now()
             update_data["updated_at"] = datetime.now()
             
             result = self.collection.update_one(
@@ -193,10 +193,10 @@ class Database:
             return result.modified_count > 0
                 
         except Exception as e:
-            raise Exception(f"Error updating quotation: {e}")
+            raise Exception(f"Error updating offer: {e}")
     
-    def get_quotations_count(self) -> int:
-        """Get total count of quotations"""
+    def get_offers_count(self) -> int:
+        """Get total count of offers"""
         try:
             if self.collection is None:
                 self.connect()
@@ -204,10 +204,10 @@ class Database:
             return self.collection.count_documents({})
             
         except Exception as e:
-            raise Exception(f"Error counting quotations: {e}")
+            raise Exception(f"Error counting offers: {e}")
     
-    def search_quotations(self, search_term: str, limit: int = 100) -> List[Dict]:
-        """Search quotations by text across multiple fields"""
+    def search_offers(self, search_term: str, limit: int = 100) -> List[Dict]:
+        """Search offers by text across multiple fields"""
         try:
             if self.collection is None:
                 self.connect()
@@ -225,37 +225,37 @@ class Database:
             
             cursor = self.collection.find(query).sort("created_at", -1).limit(limit)
             
-            quotations = []
+            offers = []
             for doc in cursor:
                 # Convert ObjectId to string
                 doc["id"] = str(doc["_id"])
                 del doc["_id"]
-                quotations.append(doc)
+                offers.append(doc)
             
-            return quotations
+            return offers
             
         except Exception as e:
-            raise Exception(f"Error searching quotations: {e}")
+            raise Exception(f"Error searching offers: {e}")
     
-    def toggle_materials_ordered(self, quotation_id: str) -> Dict:
-        """Toggle the materials_ordered status of a quotation"""
+    def toggle_materials_ordered(self, offer_id: str) -> Dict:
+        """Toggle the materials_ordered status of a offer"""
         try:
             if self.collection is None:
                 self.connect()
             
             # Convert string ID to ObjectId
-            object_id = ObjectId(quotation_id)
+            object_id = ObjectId(offer_id)
             
-            # Get current quotation
-            quotation = self.collection.find_one({"_id": object_id})
-            if not quotation:
-                raise Exception("Quotation not found")
+            # Get current offer
+            offer = self.collection.find_one({"_id": object_id})
+            if not offer:
+                raise Exception("offer not found")
             
             # Toggle the materials_ordered status
-            current_status = quotation.get("materials_ordered", False)
+            current_status = offer.get("materials_ordered", False)
             new_status = not current_status
             
-            # Update the quotation
+            # Update the offer
             result = self.collection.update_one(
                 {"_id": object_id},
                 {
@@ -269,11 +269,11 @@ class Database:
             if result.modified_count > 0:
                 return {
                     "success": True,
-                    "quotation_id": quotation_id,
+                    "offer_id": offer_id,
                     "materials_ordered": new_status
                 }
             else:
-                raise Exception("Failed to update quotation")
+                raise Exception("Failed to update offer")
                 
         except Exception as e:
             raise Exception(f"Error toggling materials_ordered status: {e}")
