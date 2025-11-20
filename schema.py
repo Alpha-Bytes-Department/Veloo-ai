@@ -7,7 +7,7 @@ class PriceDetail(BaseModel):
     Labor: float
     Total: float
     
-class QuotationRequest(BaseModel):
+class offerRequest(BaseModel):
     customer_name: str
     phone_number: str
     address: str
@@ -24,7 +24,7 @@ class Materials(BaseModel):
     unit: str	
     quantity: str
 
-class FinalQuotation(BaseModel):
+class Finaloffer(BaseModel):
     customer_name: str
     phone_number: str
     address: str
@@ -35,8 +35,8 @@ class FinalQuotation(BaseModel):
     timestamp: Optional[datetime] = None
     materials_ordered: bool = False  # Default to False if not specified
 
-class UpdateQuotationRequest(BaseModel):
-    quotation_id: str
+class UpdateofferRequest(BaseModel):
+    offer_id: str
     user_message: str
 
 # Inventory/Materials Schemas
