@@ -11,9 +11,11 @@ from schema import (
     UpdateofferRequest,
     InventoryItem,
     InventoryItemUpdate,
-    InventorySearchQuery
+    InventorySearchQuery,
+    EmailRequest,
+    EmailResponse
 )
-from offer import Generator
+from generator import Generator
 from database import Database
 
 # Initialize components
@@ -337,6 +339,46 @@ async def get_inventory_count(is_active: Optional[bool] = None):
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
 
+
+# ==================== EMAIL GENERATION ENDPOINT ====================
+
+@app.post("/email-offer", response_model=EmailResponse)
+async def generate_email_for_offer(request: EmailRequest):
+    """Generate email content for a customer based on offer ID"""
+    try:
+        # First, fetch the offer from the database
+        offer = database.get_offer_by_id(request.offer_id)
+        if not offer:
+            raise HTTPException(status_code=404, detail="Offer not found")
+        
+        # Generate email content using AI
+        email_response = generator.generate_offer_email(offer)
+        
+        return email_response
+    
+    except HTTPException:
+        raise
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+    
+@app.post("/email-acceptance", response_model=EmailResponse)
+async def generate_email_for_acceptance(request: EmailRequest):
+    """Generate email content for a customer based on offer ID"""
+    try:
+        # First, fetch the offer from the database
+        offer = database.get_offer_by_id(request.offer_id)
+        if not offer:
+            raise HTTPException(status_code=404, detail="Offer not found")
+        
+        # Generate email content using AI
+        email_response = generator.generate_acceptance_email(offer)
+        
+        return email_response
+    
+    except HTTPException:
+        raise
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
 
 if __name__ == "__main__":
     import uvicorn
