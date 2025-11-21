@@ -2,9 +2,12 @@ from openai import OpenAI
 from typing import List, Dict
 import os
 import json
-from schema import offerRequest, Finaloffer, EmailRequest, EmailResponse
+from schema import EmailResponse, Email
 from dotenv import load_dotenv
 from datetime import datetime
+import smtplib
+from email.mime.multipart import MIMEMultipart
+from email.mime.text import MIMEText
 
 load_dotenv()
 
@@ -190,3 +193,50 @@ class EmailManager:
             )
         except Exception as e:
             raise Exception(f"Error generating custom mail: {str(e)}")
+
+    def send_email(self, email_request: Email):
+        sender_email = os.getenv("SENDER_EMAIL")
+        sender_password = os.getenv("SENDER_EMAIL_PASSWORD")
+        recipient_email = email_request.to
+        subject = email_request.subject
+        body = email_request.body
+
+        # Validate credentials
+        if not sender_email or not sender_password:
+            raise Exception("Email credentials not configured. Please set SENDER_EMAIL and SENDER_EMAIL_PASSWORD in .env file")
+
+        smtp_server = None
+        try:
+            # Set up the SMTP server
+            smtp_server = smtplib.SMTP("smtp.gmail.com", 587)
+            smtp_server.starttls()
+            smtp_server.login(sender_email, sender_password)
+
+            # Create the email
+            msg = MIMEMultipart("alternative")
+            msg["From"] = sender_email
+            msg["To"] = recipient_email
+            msg["Subject"] = subject
+
+            # Add body as both plain text and HTML for better compatibility
+            text_part = MIMEText(body, "plain")
+            html_part = MIMEText(body.replace('\n', '<br>'), "html")
+            msg.attach(text_part)
+            msg.attach(html_part)
+
+            # Send the email
+            smtp_server.sendmail(sender_email, recipient_email, msg.as_string())
+        
+        except smtplib.SMTPAuthenticationError:
+            raise Exception("Email authentication failed. Please check your email credentials and ensure 'App Passwords' is enabled for Gmail")
+        except smtplib.SMTPException as e:
+            raise Exception(f"SMTP error occurred: {str(e)}")
+        except Exception as e:
+            raise Exception(f"Error sending email: {str(e)}")
+        finally:
+            # Ensure SMTP connection is always closed
+            if smtp_server:
+                try:
+                    smtp_server.quit()
+                except:
+                    pass
