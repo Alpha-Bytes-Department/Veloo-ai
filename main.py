@@ -1,4 +1,4 @@
-from fastapi import FastAPI, HTTPException, Depends
+from fastapi import FastAPI, HTTPException, Depends, Request
 from fastapi.middleware.cors import CORSMiddleware
 from typing import List, Optional
 from datetime import datetime
@@ -13,7 +13,8 @@ from schema import (
     InventoryItemUpdate,
     InventorySearchQuery,
     EmailRequest,
-    EmailResponse
+    EmailResponse,
+    Email
 )
 from generator import Generator
 from database import Database
@@ -398,6 +399,15 @@ async def generate_email_for_acceptance(request: EmailRequest):
     
     except HTTPException:
         raise
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+@app.post("/send-email", response_model=dict)
+async def send_email(request: Email):
+    """Send an email to the specified recipient"""
+    try:
+        emailManager.send_email(request)
+        return {"message": "Email sent successfully"}
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
 
