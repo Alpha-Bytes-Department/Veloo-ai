@@ -40,10 +40,15 @@ class Database:
         try:
             self.connect()
             
+            # Enable UUID extension
+            self.cursor.execute("""
+                CREATE EXTENSION IF NOT EXISTS "uuid-ossp";
+            """)
+            
             # Create offers table
             self.cursor.execute("""
                 CREATE TABLE IF NOT EXISTS offers (
-                    id SERIAL PRIMARY KEY,
+                    id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
                     customer_name TEXT NOT NULL,
                     phone_number TEXT NOT NULL,
                     address TEXT NOT NULL,
@@ -72,7 +77,7 @@ class Database:
             # Create inventory table
             self.cursor.execute("""
                 CREATE TABLE IF NOT EXISTS inventory (
-                    id SERIAL PRIMARY KEY,
+                    id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
                     name TEXT NOT NULL,
                     category TEXT NOT NULL,
                     description TEXT,
