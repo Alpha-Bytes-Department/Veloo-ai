@@ -64,8 +64,8 @@ async def generate_offer(request: offerRequest):
         # Generate offer using AI
         offer = generator.generate_offer(request)
         
-        # Save to database
-        offer_id = database.save_offer(offer)
+        # Save to database with user_id
+        offer_id = database.save_offer(offer, request.user_id)
         
         # Add the ID to the response
         offer_dict = offer.dict()
@@ -76,12 +76,12 @@ async def generate_offer(request: offerRequest):
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
 
-@app.post("/offers/save", response_model=dict)
-async def save_offer(offer: Finaloffer):
+@app.post("/offers/save")
+async def save_offer(offer: Finaloffer, user_id: str):
     """Save a final offer directly to the database"""
     try:
         # Save the offer to database
-        offer_id = database.save_offer(offer)
+        offer_id = database.save_offer(offer, user_id)
         
         # Return the saved offer with its ID
         offer_dict = offer.dict()
@@ -175,6 +175,9 @@ async def update_offer(request: UpdateofferRequest):
         if not existing_offer:
             raise HTTPException(status_code=404, detail="offer not found")
         
+        # Get user_id from existing offer
+        user_id = existing_offer.get("user_id", "")
+        
         # Convert the database result to Finaloffer object
         existing_final_offer = Finaloffer(
             customer_name=existing_offer.get("customer_name", ""),
@@ -184,7 +187,6 @@ async def update_offer(request: UpdateofferRequest):
             bill_of_materials=existing_offer.get("bill_of_materials", ""),
             time=existing_offer.get("time", ""),
             price=existing_offer.get("price", ""),
-            user_id=existing_offer.get("user_id", ""),
             timestamp=existing_offer.get("timestamp"),
             materials_ordered=existing_offer.get("materials_ordered", False)
         )
@@ -195,8 +197,8 @@ async def update_offer(request: UpdateofferRequest):
             update_request=existing_final_offer
         )
         
-        # Save the updated offer to database
-        success = database.update_offer(request.offer_id, updated_offer)
+        # Save the updated offer to database with user_id
+        success = database.update_offer(request.offer_id, updated_offer, user_id)
         if not success:
             raise HTTPException(status_code=500, detail="Failed to update offer in database")
         
