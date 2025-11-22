@@ -56,6 +56,7 @@ class Database:
                     bill_of_materials JSONB,
                     time TEXT,
                     price JSONB,
+                    user_id TEXT NOT NULL,
                     timestamp TIMESTAMP,
                     materials_ordered BOOLEAN DEFAULT FALSE,
                     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
@@ -69,6 +70,9 @@ class Database:
             """)
             self.cursor.execute("""
                 CREATE INDEX IF NOT EXISTS idx_offers_phone_number ON offers(phone_number);
+            """)
+            self.cursor.execute("""
+                CREATE INDEX IF NOT EXISTS idx_offers_user_id ON offers(user_id);
             """)
             self.cursor.execute("""
                 CREATE INDEX IF NOT EXISTS idx_offers_created_at ON offers(created_at DESC);
@@ -131,9 +135,9 @@ class Database:
             self.cursor.execute("""
                 INSERT INTO offers (
                     customer_name, phone_number, address, task_description,
-                    bill_of_materials, time, price, timestamp, materials_ordered, created_at
+                    bill_of_materials, time, price, user_id, timestamp, materials_ordered, created_at
                 )
-                VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
+                VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
                 RETURNING id
             """, (
                 offer_dict["customer_name"],
@@ -143,6 +147,7 @@ class Database:
                 Json(offer_dict["bill_of_materials"]),
                 offer_dict["time"],
                 Json(offer_dict["price"]),
+                offer_dict["user_id"],
                 timestamp,
                 offer_dict.get("materials_ordered", False),
                 created_at
@@ -212,6 +217,24 @@ class Database:
         except Exception as e:
             raise Exception(f"Error fetching customer offers: {e}")
     
+    def get_offers_by_user(self, user_id: str) -> List[Dict]:
+        """Get all offers for a specific user"""
+        try:
+            if self.conn is None:
+                self.connect()
+            
+            self.cursor.execute("""
+                SELECT * FROM offers 
+                WHERE user_id = %s 
+                ORDER BY created_at DESC
+            """, (user_id,))
+            
+            offers = self.cursor.fetchall()
+            return [dict(offer) for offer in offers]
+            
+        except Exception as e:
+            raise Exception(f"Error fetching user offers: {e}")
+    
     def delete_offer(self, offer_id: str) -> bool:
         """Delete an offer by ID"""
         try:
@@ -252,6 +275,7 @@ class Database:
                     bill_of_materials = %s,
                     time = %s,
                     price = %s,
+                    user_id = %s,
                     timestamp = %s,
                     materials_ordered = %s,
                     updated_at = %s
@@ -264,6 +288,7 @@ class Database:
                 Json(update_data["bill_of_materials"]),
                 update_data["time"],
                 Json(update_data["price"]),
+                update_data["user_id"],
                 timestamp,
                 update_data.get("materials_ordered", False),
                 updated_at,
