@@ -139,6 +139,15 @@ async def get_offers_by_customer(customer_name: str):
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
 
+@app.get("/offers/user/{user_id}")
+async def get_offers_by_user(user_id: str):
+    """Get all offers for a specific user"""
+    try:
+        offers = database.get_offers_by_user(user_id)
+        return offers
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
 @app.get("/offers/search/{search_term}")
 async def search_offers(search_term: str, limit: Optional[int] = 100):
     """Search offers by text across multiple fields"""
@@ -175,6 +184,7 @@ async def update_offer(request: UpdateofferRequest):
             bill_of_materials=existing_offer.get("bill_of_materials", ""),
             time=existing_offer.get("time", ""),
             price=existing_offer.get("price", ""),
+            user_id=existing_offer.get("user_id", ""),
             timestamp=existing_offer.get("timestamp"),
             materials_ordered=existing_offer.get("materials_ordered", False)
         )
