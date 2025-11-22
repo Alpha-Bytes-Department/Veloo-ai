@@ -119,7 +119,7 @@ class Database:
             print(f"Error initializing database: {e}")
             raise
     
-    def save_offer(self, offer: Finaloffer) -> str:
+    def save_offer(self, offer: Finaloffer, user_id: str) -> str:
         """Save an offer to the database"""
         try:
             if self.conn is None:
@@ -147,7 +147,7 @@ class Database:
                 Json(offer_dict["bill_of_materials"]),
                 offer_dict["time"],
                 Json(offer_dict["price"]),
-                offer_dict["user_id"],
+                user_id,
                 timestamp,
                 offer_dict.get("materials_ordered", False),
                 created_at
@@ -254,7 +254,7 @@ class Database:
                 self.conn.rollback()
             raise Exception(f"Error deleting offer: {e}")
     
-    def update_offer(self, offer_id: str, offer: Finaloffer) -> bool:
+    def update_offer(self, offer_id: str, offer: Finaloffer, user_id: str) -> bool:
         """Update an existing offer"""
         try:
             if self.conn is None:
@@ -288,7 +288,7 @@ class Database:
                 Json(update_data["bill_of_materials"]),
                 update_data["time"],
                 Json(update_data["price"]),
-                update_data["user_id"],
+                user_id,
                 timestamp,
                 update_data.get("materials_ordered", False),
                 updated_at,
