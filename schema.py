@@ -33,7 +33,6 @@ class Finaloffer(BaseModel):
     bill_of_materials: List[Materials]
     time: str 
     price: PriceDetail
-    user_id: str
     timestamp: Optional[datetime] = None
     materials_ordered: bool = False  # Default to False if not specified
 
