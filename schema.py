@@ -14,6 +14,7 @@ class offerRequest(BaseModel):
     project_start: str
     select_task: str
     explaination: str
+    user_id: str
     timestamp: Optional[datetime] = None
 
 class Materials(BaseModel):
@@ -32,6 +33,7 @@ class Finaloffer(BaseModel):
     bill_of_materials: List[Materials]
     time: str 
     price: PriceDetail
+    user_id: str
     timestamp: Optional[datetime] = None
     materials_ordered: bool = False  # Default to False if not specified
 
