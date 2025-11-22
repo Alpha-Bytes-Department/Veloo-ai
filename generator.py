@@ -103,7 +103,6 @@ class Generator:
             Project Start Date: {offer_request.project_start}
             Task Selected: {offer_request.select_task}
             Additional Details: {offer_request.explaination}
-            User ID: {offer_request.user_id}
             Time: {datetime.now().isoformat()}
             Materials Ordered: False (Set by default)
             
@@ -186,7 +185,6 @@ class Generator:
             Bill of Materials: {update_request.bill_of_materials}
             Time: {update_request.time}
             Price: {update_request.price}
-            User ID: {update_request.user_id}
             
             Please update the offer as per user request:
             {user_message}
