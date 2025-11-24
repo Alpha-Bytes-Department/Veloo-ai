@@ -62,7 +62,7 @@ async def generate_offer(request: offerRequest):
     """Generate a new offer using AI"""
     try:
         # Generate offer using AI
-        offer = generator.generate_offer(request)
+        offer = await generator.generate_offer(request)
         
         # Save to database with user_id
         offer_id = database.save_offer(offer, request.user_id)
@@ -192,7 +192,7 @@ async def update_offer(request: UpdateofferRequest):
         )
         
         # Use the generator's update_offer method
-        updated_offer = generator.update_offer(
+        updated_offer = await generator.update_offer(
             user_message=request.user_message,
             update_request=existing_final_offer
         )
@@ -336,23 +336,23 @@ async def search_inventory(search_query: InventorySearchQuery):
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
 
-@app.get("/inventory/category/{category}")
-async def get_inventory_by_category(category: str):
-    """Get all inventory items in a specific category"""
-    try:
-        items = database.get_inventory_by_category(category)
-        return items
-    except Exception as e:
-        raise HTTPException(status_code=500, detail=str(e))
+# @app.get("/inventory/category/{category}")
+# async def get_inventory_by_category(category: str):
+#     """Get all inventory items in a specific category"""
+#     try:
+#         items = database.get_inventory_by_category(category)
+#         return items
+#     except Exception as e:
+#         raise HTTPException(status_code=500, detail=str(e))
 
-@app.get("/inventory/stats/count")
-async def get_inventory_count(active: Optional[bool] = None):
-    """Get total count of inventory items"""
-    try:
-        count = database.get_inventory_count(active=active)
-        return {"total_items": count}
-    except Exception as e:
-        raise HTTPException(status_code=500, detail=str(e))
+# @app.get("/inventory/stats/count")
+# async def get_inventory_count(active: Optional[bool] = None):
+#     """Get total count of inventory items"""
+#     try:
+#         count = database.get_inventory_count(active=active)
+#         return {"total_items": count}
+#     except Exception as e:
+#         raise HTTPException(status_code=500, detail=str(e))
 
 
 # ==================== EMAIL GENERATION ENDPOINT ====================
