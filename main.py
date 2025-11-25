@@ -71,6 +71,17 @@ async def generate_offer(request: offerRequest):
         offer_dict = offer.dict()
         offer_dict["id"] = offer_id
         
+        # Parse bill of materials into a formatted string
+        bill_of_materials_string = ""
+        for idx, material in enumerate(offer.bill_of_materials, 1):
+            bill_of_materials_string += f"{idx}. {material.material}\n"
+            bill_of_materials_string += f"   Category: {material.category}\n"
+            bill_of_materials_string += f"   Quantity: {material.quantity} {material.unit}\n"
+            bill_of_materials_string += f"   Price: {material.price}\n"
+            bill_of_materials_string += f"   Description: {material.description}\n\n"
+        
+        offer_dict["bill_of_materials_string"] = bill_of_materials_string.strip()
+
         return offer_dict
     
     except Exception as e:
