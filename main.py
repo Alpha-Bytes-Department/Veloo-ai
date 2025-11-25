@@ -89,11 +89,15 @@ async def generate_offer(request: offerRequest):
         raise HTTPException(status_code=500, detail=str(e))
 
 @app.put("/offers/save")
-async def save_offer(request: SaveUpdatedOffer, user_id: str):
+async def save_offer(request: SaveUpdatedOffer):
     """Save or update a final offer directly to the database"""
     try:
         # Extract offer_id from request
         offer_id = request.offer_id
+        user_id = request.user_id
+        # Validate that offer_id is not empty or placeholder
+        if not offer_id or offer_id.lower() in ['string', 'null', 'undefined', '']:
+            raise HTTPException(status_code=400, detail="Invalid or missing offer_id")
         
         # Create Finaloffer object from request (excluding offer_id)
         offer_data = request.dict(exclude={'offer_id'})
@@ -145,9 +149,24 @@ async def get_offer(offer_id: str):
     """Get a specific offer by ID"""
     try:
         offer = database.get_offer_by_id(offer_id)
+        
         if not offer:
             raise HTTPException(status_code=404, detail="offer not found")
+        
+        # Parse bill of materials into a formatted string
+        bill_of_materials_string = ""
+        for idx, material in enumerate(offer["bill_of_materials"], 1):
+            bill_of_materials_string += f"{idx}. {material['material']}\n"
+            bill_of_materials_string += f"   Category: {material['category']}\n"
+            bill_of_materials_string += f"   Quantity: {material['quantity']} {material['unit']}\n"
+            bill_of_materials_string += f"   Price: {material['price']}\n"
+            bill_of_materials_string += f"   Description: {material['description']}\n\n"
+        
+        offer["bill_of_materials_string"] = bill_of_materials_string.strip()
         return offer
+    
+    except HTTPException:
+        raise
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
 
