@@ -31,12 +31,30 @@ class Generator:
                         "required": ["query"],
                     },
                 }
+            },
+            {
+                "type": "function",
+                "function": {
+                    "name": "search_available_resources",
+                    "description": "Search for available workers (manpower resources) for a specific user. Returns the names of workers who are available to be assigned to tasks.",
+                    "parameters": {
+                        "type": "object",
+                        "properties": {
+                            "user_id": {
+                                "type": "string",
+                                "description": "The user ID to search available workers for.",
+                            },
+                        },
+                        "required": ["user_id"],
+                    },
+                }
             }
         ]
 
         self.system_prompt = """You are a professional offer generator assistant. 
         Generate detailed construction/service offers based on customer requirements.
         Provide comprehensive bill of materials, time estimates, and accurate pricing.
+        Assign an available worker name to the 'resource' field by using the search_available_resources tool.
         Format your response as a structured offer with all required fields."""
 
     def get_inventory_data(self, query: str) -> Dict:
@@ -87,7 +105,34 @@ class Generator:
             return {
                 "error": f"Error fetching inventory data: {str(e)}",
                 "items": []
-            } 
+            }
+    
+    def search_available_resources(self, user_id: str) -> Dict:
+        """
+        Search for available workers (manpower resources) for a specific user.
+        Returns the names of workers who are available to be assigned to tasks.
+        """
+        try:
+            if not self.database:
+                return {
+                    "error": "Database connection not available",
+                    "resources": []
+                }
+            
+            # Call database method to get available resources
+            resources = self.database.search_available_resources(user_id)
+            
+            return {
+                "user_id": user_id,
+                "resources_found": len(resources),
+                "resources": resources
+            }
+            
+        except Exception as e:
+            return {
+                "error": f"Error fetching available resources: {str(e)}",
+                "resources": []
+            }
     
     
     def generate_offer(self, offer_request: offerRequest) -> Finaloffer:
@@ -103,6 +148,7 @@ class Generator:
             Task Selected: {offer_request.select_task}
             Additional Details: {offer_request.explaination}
             Time: {datetime.now().isoformat()}
+            User ID: {offer_request.user_id}
             Materials Ordered: False (Set by default)
             Offer status: Set to "Pending" by default
             
@@ -110,7 +156,8 @@ class Generator:
             1. Detailed task description
             2. Complete bill of materials with quantities and costs
             3. Time estimate for completion
-            4. Total price breakdown
+            4. Available worker name (use search_available_resources tool to find and assign a worker name to the 'resource' field)
+            5. Total price breakdown
             """
             
             # Create messages for chat completion
@@ -146,6 +193,18 @@ class Generator:
                             "role": "tool",
                             "tool_call_id": tool_call.id,
                             "content": json.dumps(inventory_data)
+                        })
+                    
+                    elif tool_call.function.name == "search_available_resources":
+                        # Execute the function logic
+                        arguments = json.loads(tool_call.function.arguments)
+                        resources_data = self.search_available_resources(arguments.get("user_id", ""))
+                        
+                        # 4. Provide function call results to the model
+                        messages.append({
+                            "role": "tool",
+                            "tool_call_id": tool_call.id,
+                            "content": json.dumps(resources_data)
                         })
                 
                 # 5. Get final response with tool results

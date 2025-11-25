@@ -55,6 +55,7 @@ class Database:
                     task_description TEXT,
                     bill_of_materials JSONB,
                     time TEXT,
+                    resource TEXT,
                     status TEXT DEFAULT 'Pending',
                     price JSONB,
                     user_id TEXT NOT NULL,
@@ -136,9 +137,9 @@ class Database:
             self.cursor.execute("""
                 INSERT INTO offers (
                     customer_name, phone_number, address, task_description,
-                    bill_of_materials, time, status, price, user_id, timestamp, materials_ordered, created_at
+                    bill_of_materials, time, resource, status, price, user_id, timestamp, materials_ordered, created_at
                 )
-                VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
+                VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
                 RETURNING id
             """, (
                 offer_dict["customer_name"],
@@ -147,6 +148,7 @@ class Database:
                 offer_dict["task_description"],
                 Json(offer_dict["bill_of_materials"]),
                 offer_dict["time"],
+                offer_dict.get("resource", ""),
                 offer_dict.get("status", "Pending"),
                 Json(offer_dict["price"]),
                 user_id,
@@ -276,6 +278,7 @@ class Database:
                     task_description = %s,
                     bill_of_materials = %s,
                     time = %s,
+                    resource = %s,
                     status = %s,
                     price = %s,
                     user_id = %s,
@@ -290,6 +293,7 @@ class Database:
                 update_data["task_description"],
                 Json(update_data["bill_of_materials"]),
                 update_data["time"],
+                update_data.get("resource", ""),
                 update_data.get("status", "Pending"),
                 Json(update_data["price"]),
                 user_id,
@@ -620,5 +624,25 @@ class Database:
             
         except Exception as e:
             raise Exception(f"Error fetching inventory by category: {e}")
+    
+    def search_available_resources(self, user_id: str) -> List[Dict]:
+        """
+        Search for available manpower resources for a specific user.
+        Currently returns placeholder data with names.
+        TODO: Complete implementation with proper resources table and availability slots.
+        """
+        try:
+            # Placeholder implementation - returns sample resource data
+            # This will be replaced with actual database query when resources table is created
+            placeholder_resources = [
+                {"John Doe": "Resource 1"},
+                {"Istiaque Ahmed": "Resource 2"},
+                {"Aber Islam": "Resource 3"}
+            ]
+            
+            return placeholder_resources
+            
+        except Exception as e:
+            raise Exception(f"Error fetching available resources: {e}")
 
 
