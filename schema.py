@@ -1,5 +1,5 @@
 from pydantic import BaseModel, Field
-from typing import List, Optional
+from typing import List, Optional, Literal
 from datetime import datetime
 
 class PriceDetail(BaseModel):
@@ -31,7 +31,8 @@ class Finaloffer(BaseModel):
     address: str
     task_description: str 
     bill_of_materials: List[Materials]
-    time: str 
+    time: str
+    status: Literal["Pending", "Accepted", "Rejected"] = "Pending" 
     price: PriceDetail
     timestamp: Optional[datetime] = None
     materials_ordered: bool = False  # Default to False if not specified
