@@ -32,6 +32,7 @@ class Finaloffer(BaseModel):
     task_description: str 
     bill_of_materials: List[Materials]
     time: str
+    resource: str  # Name of the available worker assigned to the task
     status: Literal["Pending", "Accepted", "Rejected"] = "Pending" 
     price: PriceDetail
     timestamp: Optional[datetime] = None
