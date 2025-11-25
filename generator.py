@@ -105,6 +105,7 @@ class Generator:
             Additional Details: {offer_request.explaination}
             Time: {datetime.now().isoformat()}
             Materials Ordered: False (Set by default)
+            Offer status: Set to "Pending" by default
             
             Please provide:
             1. Detailed task description
