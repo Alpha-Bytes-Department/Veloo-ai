@@ -55,6 +55,7 @@ class Database:
                     task_description TEXT,
                     bill_of_materials JSONB,
                     time TEXT,
+                    status TEXT DEFAULT 'Pending',
                     price JSONB,
                     user_id TEXT NOT NULL,
                     timestamp TIMESTAMP,
@@ -135,9 +136,9 @@ class Database:
             self.cursor.execute("""
                 INSERT INTO offers (
                     customer_name, phone_number, address, task_description,
-                    bill_of_materials, time, price, user_id, timestamp, materials_ordered, created_at
+                    bill_of_materials, time, status, price, user_id, timestamp, materials_ordered, created_at
                 )
-                VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
+                VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
                 RETURNING id
             """, (
                 offer_dict["customer_name"],
@@ -146,6 +147,7 @@ class Database:
                 offer_dict["task_description"],
                 Json(offer_dict["bill_of_materials"]),
                 offer_dict["time"],
+                offer_dict.get("status", "Pending"),
                 Json(offer_dict["price"]),
                 user_id,
                 timestamp,
@@ -274,6 +276,7 @@ class Database:
                     task_description = %s,
                     bill_of_materials = %s,
                     time = %s,
+                    status = %s,
                     price = %s,
                     user_id = %s,
                     timestamp = %s,
@@ -287,6 +290,7 @@ class Database:
                 update_data["task_description"],
                 Json(update_data["bill_of_materials"]),
                 update_data["time"],
+                update_data.get("status", "Pending"),
                 Json(update_data["price"]),
                 user_id,
                 timestamp,
