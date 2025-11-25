@@ -9,6 +9,7 @@ from schema import (
     offerRequest, 
     Finaloffer, 
     UpdateofferRequest,
+    SaveUpdatedOffer,
     InventoryItem,
     InventoryItemUpdate,
     InventorySearchQuery,
@@ -87,23 +88,43 @@ async def generate_offer(request: offerRequest):
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
 
-@app.post("/offers/save")
-async def save_offer(offer: Finaloffer, user_id: str):
-    """Save a final offer directly to the database"""
+@app.put("/offers/save")
+async def save_offer(request: SaveUpdatedOffer, user_id: str):
+    """Save or update a final offer directly to the database"""
     try:
-        # Save the offer to database
-        offer_id = database.save_offer(offer, user_id)
+        # Extract offer_id from request
+        offer_id = request.offer_id
         
-        # Return the saved offer with its ID
+        # Create Finaloffer object from request (excluding offer_id)
+        offer_data = request.dict(exclude={'offer_id'})
+        offer = Finaloffer(**offer_data)
+        
+        # Check if offer exists
+        existing_offer = database.get_offer_by_id(offer_id)
+        
+        if existing_offer:
+            # Update existing offer
+            success = database.update_offer(offer_id, offer, user_id)
+            if not success:
+                raise HTTPException(status_code=500, detail="Failed to update offer in database")
+            message = "Offer updated successfully"
+        else:
+            # Save new offer with specified offer_id
+            database.save_offer(offer, user_id)
+            message = "Offer saved successfully"
+        
+        # Return the saved/updated offer with its ID
         offer_dict = offer.dict()
         offer_dict["id"] = offer_id
         
         return {
-            "message": "offer saved successfully",
+            "message": message,
             "offer_id": offer_id,
             "offer": offer_dict
         }
     
+    except HTTPException:
+        raise
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
 
