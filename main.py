@@ -57,7 +57,7 @@ async def health_check():
     """Health check endpoint"""
     return {"status": "healthy", "timestamp": datetime.now()}
 
-@app.post("/offers/generate", response_model=Finaloffer)
+@app.post("/offers/generate")
 async def generate_offer(request: offerRequest):
     """Generate a new offer using AI"""
     try:
@@ -186,6 +186,7 @@ async def update_offer(request: UpdateofferRequest):
             task_description=existing_offer.get("task_description", ""),
             bill_of_materials=existing_offer.get("bill_of_materials", ""),
             time=existing_offer.get("time", ""),
+            status=existing_offer.get("status", "Pending"),
             price=existing_offer.get("price", ""),
             timestamp=existing_offer.get("timestamp"),
             materials_ordered=existing_offer.get("materials_ordered", False)
