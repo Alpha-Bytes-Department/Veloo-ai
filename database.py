@@ -15,14 +15,13 @@ class Database:
         # Get PostgreSQL connection string from environment variable
         self.connection_string = os.getenv("DATABASE_URL")
         self.conn = None
-        self.cursor = None
         
     def connect(self):
         """Establish connection to PostgreSQL"""
         try:
-            self.conn = psycopg2.connect(self.connection_string)
-            self.cursor = self.conn.cursor(cursor_factory=RealDictCursor)
-            print("Successfully connected to PostgreSQL")
+            if self.conn is None or self.conn.closed:
+                self.conn = psycopg2.connect(self.connection_string)
+                print("Successfully connected to PostgreSQL")
             
         except Exception as e:
             print(f"Error connecting to PostgreSQL: {e}")
@@ -30,23 +29,29 @@ class Database:
     
     def disconnect(self):
         """Close PostgreSQL connection"""
-        if self.cursor:
-            self.cursor.close()
-        if self.conn:
+        if self.conn and not self.conn.closed:
             self.conn.close()
+    
+    def get_cursor(self):
+        """Get a new cursor with proper connection checking"""
+        if self.conn is None or self.conn.closed:
+            self.connect()
+        return self.conn.cursor(cursor_factory=RealDictCursor)
     
     def init_db(self):
         """Initialize the database with required tables"""
+        cursor = None
         try:
             self.connect()
+            cursor = self.get_cursor()
             
             # Enable UUID extension
-            self.cursor.execute("""
+            cursor.execute("""
                 CREATE EXTENSION IF NOT EXISTS "uuid-ossp";
             """)
             
             # Create offers table
-            self.cursor.execute("""
+            cursor.execute("""
                 CREATE TABLE IF NOT EXISTS offers (
                     id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
                     customer_name TEXT NOT NULL,
@@ -67,21 +72,21 @@ class Database:
             """)
             
             # Create indexes for offers
-            self.cursor.execute("""
+            cursor.execute("""
                 CREATE INDEX IF NOT EXISTS idx_offers_customer_name ON offers(customer_name);
             """)
-            self.cursor.execute("""
+            cursor.execute("""
                 CREATE INDEX IF NOT EXISTS idx_offers_phone_number ON offers(phone_number);
             """)
-            self.cursor.execute("""
+            cursor.execute("""
                 CREATE INDEX IF NOT EXISTS idx_offers_user_id ON offers(user_id);
             """)
-            self.cursor.execute("""
+            cursor.execute("""
                 CREATE INDEX IF NOT EXISTS idx_offers_created_at ON offers(created_at DESC);
             """)
             
             # Create inventory table
-            self.cursor.execute("""
+            cursor.execute("""
                 CREATE TABLE IF NOT EXISTS inventory (
                     id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
                     name TEXT NOT NULL,
@@ -96,19 +101,19 @@ class Database:
             """)
             
             # Create indexes for inventory
-            self.cursor.execute("""
+            cursor.execute("""
                 CREATE INDEX IF NOT EXISTS idx_inventory_name ON inventory(name);
             """)
-            self.cursor.execute("""
+            cursor.execute("""
                 CREATE INDEX IF NOT EXISTS idx_inventory_category ON inventory(category);
             """)
-            self.cursor.execute("""
+            cursor.execute("""
                 CREATE INDEX IF NOT EXISTS idx_inventory_brand ON inventory(brand);
             """)
-            self.cursor.execute("""
+            cursor.execute("""
                 CREATE INDEX IF NOT EXISTS idx_inventory_active ON inventory(active);
             """)
-            self.cursor.execute("""
+            cursor.execute("""
                 CREATE INDEX IF NOT EXISTS idx_inventory_created_at ON inventory(created_at DESC);
             """)
             
@@ -120,12 +125,16 @@ class Database:
                 self.conn.rollback()
             print(f"Error initializing database: {e}")
             raise
+        finally:
+            if cursor:
+                cursor.close()
     
     def save_offer(self, offer: Finaloffer, user_id: str) -> str:
         """Save an offer to the database"""
+        cursor = None
         try:
-            if self.conn is None:
-                self.connect()
+            self.connect()
+            cursor = self.get_cursor()
             
             # Convert Pydantic model to dict
             offer_dict = offer.dict()
@@ -134,7 +143,7 @@ class Database:
             created_at = datetime.now()
             timestamp = offer_dict.get("timestamp") or datetime.now()
             
-            self.cursor.execute("""
+            cursor.execute("""
                 INSERT INTO offers (
                     customer_name, phone_number, address, task_description,
                     bill_of_materials, time, resource, status, price, user_id, timestamp, materials_ordered, created_at
@@ -157,7 +166,7 @@ class Database:
                 created_at
             ))
             
-            offer_id = self.cursor.fetchone()["id"]
+            offer_id = cursor.fetchone()["id"]
             self.conn.commit()
             return str(offer_id)
             
@@ -165,18 +174,22 @@ class Database:
             if self.conn:
                 self.conn.rollback()
             raise Exception(f"Error saving offer: {e}")
+        finally:
+            if cursor:
+                cursor.close()
     
     def get_offer_by_id(self, offer_id: str) -> Optional[Dict]:
         """Get an offer by its ID"""
+        cursor = None
         try:
-            if self.conn is None:
-                self.connect()
+            self.connect()
+            cursor = self.get_cursor()
             
-            self.cursor.execute("""
+            cursor.execute("""
                 SELECT * FROM offers WHERE id = %s
             """, (offer_id,))
             
-            offer = self.cursor.fetchone()
+            offer = cursor.fetchone()
             
             if offer:
                 return dict(offer)
@@ -184,72 +197,88 @@ class Database:
             
         except Exception as e:
             raise Exception(f"Error fetching offer: {e}")
+        finally:
+            if cursor:
+                cursor.close()
     
     def get_all_offers(self, limit: int = 100, offset: int = 0) -> List[Dict]:
         """Get all offers with pagination"""
+        cursor = None
         try:
-            if self.conn is None:
-                self.connect()
+            self.connect()
+            cursor = self.get_cursor()
             
-            self.cursor.execute("""
+            cursor.execute("""
                 SELECT * FROM offers 
                 ORDER BY created_at DESC 
                 LIMIT %s OFFSET %s
             """, (limit, offset))
             
-            offers = self.cursor.fetchall()
+            offers = cursor.fetchall()
             return [dict(offer) for offer in offers]
             
         except Exception as e:
             raise Exception(f"Error fetching offers: {e}")
+        finally:
+            if cursor:
+                cursor.close()
     
     def get_offers_by_customer(self, customer_name: str) -> List[Dict]:
         """Get all offers for a specific customer"""
+        cursor = None
         try:
-            if self.conn is None:
-                self.connect()
+            self.connect()
+            cursor = self.get_cursor()
             
-            self.cursor.execute("""
+            cursor.execute("""
                 SELECT * FROM offers 
                 WHERE customer_name ILIKE %s 
                 ORDER BY created_at DESC
             """, (f"%{customer_name}%",))
             
-            offers = self.cursor.fetchall()
+            offers = cursor.fetchall()
             return [dict(offer) for offer in offers]
             
         except Exception as e:
             raise Exception(f"Error fetching customer offers: {e}")
+        finally:
+            if cursor:
+                cursor.close()
     
     def get_offers_by_user(self, user_id: str) -> List[Dict]:
         """Get all offers for a specific user"""
+        cursor = None
         try:
-            if self.conn is None:
-                self.connect()
+            self.connect()
+            cursor = self.get_cursor()
             
-            self.cursor.execute("""
+            cursor.execute("""
                 SELECT * FROM offers 
                 WHERE user_id = %s 
                 ORDER BY created_at DESC
             """, (user_id,))
             
-            offers = self.cursor.fetchall()
+            offers = cursor.fetchall()
             return [dict(offer) for offer in offers]
             
         except Exception as e:
             raise Exception(f"Error fetching user offers: {e}")
+        finally:
+            if cursor:
+                cursor.close()
     
     def delete_offer(self, offer_id: str) -> bool:
         """Delete an offer by ID"""
+        cursor = None
         try:
-            if self.conn is None:
-                self.connect()
+            self.connect()
+            cursor = self.get_cursor()
             
-            self.cursor.execute("""
+            cursor.execute("""
                 DELETE FROM offers WHERE id = %s
             """, (offer_id,))
             
-            deleted = self.cursor.rowcount > 0
+            deleted = cursor.rowcount > 0
             self.conn.commit()
             return deleted
                 
@@ -257,12 +286,16 @@ class Database:
             if self.conn:
                 self.conn.rollback()
             raise Exception(f"Error deleting offer: {e}")
+        finally:
+            if cursor:
+                cursor.close()
     
     def update_offer(self, offer_id: str, offer: Finaloffer, user_id: str) -> bool:
         """Update an existing offer"""
+        cursor = None
         try:
-            if self.conn is None:
-                self.connect()
+            self.connect()
+            cursor = self.get_cursor()
             
             # Convert Pydantic model to dict
             update_data = offer.dict()
@@ -270,7 +303,7 @@ class Database:
             timestamp = update_data.get("timestamp") or datetime.now()
             updated_at = datetime.now()
             
-            self.cursor.execute("""
+            cursor.execute("""
                 UPDATE offers SET
                     customer_name = %s,
                     phone_number = %s,
@@ -303,7 +336,7 @@ class Database:
                 offer_id
             ))
             
-            modified = self.cursor.rowcount > 0
+            modified = cursor.rowcount > 0
             self.conn.commit()
             return modified
                 
@@ -311,29 +344,37 @@ class Database:
             if self.conn:
                 self.conn.rollback()
             raise Exception(f"Error updating offer: {e}")
+        finally:
+            if cursor:
+                cursor.close()
     
     def get_offers_count(self) -> int:
         """Get total count of offers"""
+        cursor = None
         try:
-            if self.conn is None:
-                self.connect()
+            self.connect()
+            cursor = self.get_cursor()
             
-            self.cursor.execute("SELECT COUNT(*) as count FROM offers")
-            result = self.cursor.fetchone()
+            cursor.execute("SELECT COUNT(*) as count FROM offers")
+            result = cursor.fetchone()
             return result["count"]
             
         except Exception as e:
             raise Exception(f"Error counting offers: {e}")
+        finally:
+            if cursor:
+                cursor.close()
     
     def search_offers(self, search_term: str, limit: int = 100) -> List[Dict]:
         """Search offers by text across multiple fields"""
+        cursor = None
         try:
-            if self.conn is None:
-                self.connect()
+            self.connect()
+            cursor = self.get_cursor()
             
             search_pattern = f"%{search_term}%"
             
-            self.cursor.execute("""
+            cursor.execute("""
                 SELECT * FROM offers 
                 WHERE customer_name ILIKE %s 
                    OR phone_number ILIKE %s 
@@ -343,24 +384,28 @@ class Database:
                 LIMIT %s
             """, (search_pattern, search_pattern, search_pattern, search_pattern, limit))
             
-            offers = self.cursor.fetchall()
+            offers = cursor.fetchall()
             return [dict(offer) for offer in offers]
             
         except Exception as e:
             raise Exception(f"Error searching offers: {e}")
+        finally:
+            if cursor:
+                cursor.close()
     
     def toggle_materials_ordered(self, offer_id: str) -> Dict:
         """Toggle the materials_ordered status of an offer"""
+        cursor = None
         try:
-            if self.conn is None:
-                self.connect()
+            self.connect()
+            cursor = self.get_cursor()
             
             # Get current offer
-            self.cursor.execute("""
+            cursor.execute("""
                 SELECT materials_ordered FROM offers WHERE id = %s
             """, (offer_id,))
             
-            offer = self.cursor.fetchone()
+            offer = cursor.fetchone()
             if not offer:
                 raise Exception("offer not found")
             
@@ -369,7 +414,7 @@ class Database:
             new_status = not current_status
             
             # Update the offer
-            self.cursor.execute("""
+            cursor.execute("""
                 UPDATE offers SET 
                     materials_ordered = %s,
                     updated_at = %s
@@ -388,19 +433,23 @@ class Database:
             if self.conn:
                 self.conn.rollback()
             raise Exception(f"Error toggling materials_ordered status: {e}")
+        finally:
+            if cursor:
+                cursor.close()
 
     # ==================== INVENTORY MANAGEMENT METHODS ====================
     
     def create_inventory_item(self, item: InventoryItem) -> str:
         """Create a new inventory item"""
+        cursor = None
         try:
-            if self.conn is None:
-                self.connect()
+            self.connect()
+            cursor = self.get_cursor()
             
             # Convert Pydantic model to dict
             item_dict = item.dict(exclude={'id'})
             
-            self.cursor.execute("""
+            cursor.execute("""
                 INSERT INTO inventory (
                     name, category, description, brand, default_price, active, created_at, updated_at
                 )
@@ -417,7 +466,7 @@ class Database:
                 datetime.now()
             ))
             
-            item_id = self.cursor.fetchone()["id"]
+            item_id = cursor.fetchone()["id"]
             self.conn.commit()
             return str(item_id)
             
@@ -425,18 +474,22 @@ class Database:
             if self.conn:
                 self.conn.rollback()
             raise Exception(f"Error creating inventory item: {e}")
+        finally:
+            if cursor:
+                cursor.close()
     
     def get_inventory_item_by_id(self, item_id: str) -> Optional[Dict]:
         """Get an inventory item by its ID"""
+        cursor = None
         try:
-            if self.conn is None:
-                self.connect()
+            self.connect()
+            cursor = self.get_cursor()
             
-            self.cursor.execute("""
+            cursor.execute("""
                 SELECT * FROM inventory WHERE id = %s
             """, (item_id,))
             
-            item = self.cursor.fetchone()
+            item = cursor.fetchone()
             
             if item:
                 return dict(item)
@@ -444,6 +497,9 @@ class Database:
             
         except Exception as e:
             raise Exception(f"Error fetching inventory item: {e}")
+        finally:
+            if cursor:
+                cursor.close()
     
     def get_all_inventory_items(self, 
                                  limit: int = 100, 
@@ -451,9 +507,10 @@ class Database:
                                  active: Optional[bool] = None,
                                  category: Optional[str] = None) -> List[Dict]:
         """Get all inventory items with optional filters and pagination"""
+        cursor = None
         try:
-            if self.conn is None:
-                self.connect()
+            self.connect()
+            cursor = self.get_cursor()
             
             # Build query with filters
             conditions = []
@@ -471,24 +528,28 @@ class Database:
             
             params.extend([limit, offset])
             
-            self.cursor.execute(f"""
+            cursor.execute(f"""
                 SELECT * FROM inventory 
                 {where_clause}
                 ORDER BY created_at DESC 
                 LIMIT %s OFFSET %s
             """, params)
             
-            items = self.cursor.fetchall()
+            items = cursor.fetchall()
             return [dict(item) for item in items]
             
         except Exception as e:
             raise Exception(f"Error fetching inventory items: {e}")
+        finally:
+            if cursor:
+                cursor.close()
     
     def update_inventory_item(self, item_id: str, update_data: Dict) -> bool:
         """Update an existing inventory item"""
+        cursor = None
         try:
-            if self.conn is None:
-                self.connect()
+            self.connect()
+            cursor = self.get_cursor()
             
             # Remove None values from update data
             update_data = {k: v for k, v in update_data.items() if v is not None}
@@ -516,9 +577,9 @@ class Database:
                 WHERE id = %s
             """
             
-            self.cursor.execute(query, params)
+            cursor.execute(query, params)
             
-            modified = self.cursor.rowcount > 0
+            modified = cursor.rowcount > 0
             self.conn.commit()
             return modified
                 
@@ -526,18 +587,22 @@ class Database:
             if self.conn:
                 self.conn.rollback()
             raise Exception(f"Error updating inventory item: {e}")
+        finally:
+            if cursor:
+                cursor.close()
     
     def delete_inventory_item(self, item_id: str) -> bool:
         """Delete an inventory item by ID"""
+        cursor = None
         try:
-            if self.conn is None:
-                self.connect()
+            self.connect()
+            cursor = self.get_cursor()
             
-            self.cursor.execute("""
+            cursor.execute("""
                 DELETE FROM inventory WHERE id = %s
             """, (item_id,))
             
-            deleted = self.cursor.rowcount > 0
+            deleted = cursor.rowcount > 0
             self.conn.commit()
             return deleted
                 
@@ -545,6 +610,9 @@ class Database:
             if self.conn:
                 self.conn.rollback()
             raise Exception(f"Error deleting inventory item: {e}")
+        finally:
+            if cursor:
+                cursor.close()
     
     def search_inventory_items(self, 
                                search_term: str, 
@@ -552,9 +620,10 @@ class Database:
                                active: bool = True,
                                limit: int = 100) -> List[Dict]:
         """Search inventory items by text across multiple fields"""
+        cursor = None
         try:
-            if self.conn is None:
-                self.connect()
+            self.connect()
+            cursor = self.get_cursor()
             
             search_pattern = f"%{search_term}%"
             
@@ -575,55 +644,66 @@ class Database:
             
             where_clause = " AND ".join(conditions)
             
-            self.cursor.execute(f"""
+            cursor.execute(f"""
                 SELECT * FROM inventory 
                 WHERE {where_clause}
                 ORDER BY created_at DESC 
                 LIMIT %s
             """, params)
             
-            items = self.cursor.fetchall()
+            items = cursor.fetchall()
             return [dict(item) for item in items]
             
         except Exception as e:
             raise Exception(f"Error searching inventory items: {e}")
+        finally:
+            if cursor:
+                cursor.close()
     
     def get_inventory_count(self, active: Optional[bool] = None) -> int:
         """Get total count of inventory items"""
+        cursor = None
         try:
-            if self.conn is None:
-                self.connect()
+            self.connect()
+            cursor = self.get_cursor()
             
             if active is not None:
-                self.cursor.execute("""
+                cursor.execute("""
                     SELECT COUNT(*) as count FROM inventory WHERE active = %s
                 """, (active,))
             else:
-                self.cursor.execute("SELECT COUNT(*) as count FROM inventory")
+                cursor.execute("SELECT COUNT(*) as count FROM inventory")
             
-            result = self.cursor.fetchone()
+            result = cursor.fetchone()
             return result["count"]
             
         except Exception as e:
             raise Exception(f"Error counting inventory items: {e}")
+        finally:
+            if cursor:
+                cursor.close()
     
     def get_inventory_by_category(self, category: str) -> List[Dict]:
         """Get all inventory items in a specific category"""
+        cursor = None
         try:
-            if self.conn is None:
-                self.connect()
+            self.connect()
+            cursor = self.get_cursor()
             
-            self.cursor.execute("""
+            cursor.execute("""
                 SELECT * FROM inventory 
                 WHERE category ILIKE %s AND active = TRUE
                 ORDER BY name ASC
             """, (f"%{category}%",))
             
-            items = self.cursor.fetchall()
+            items = cursor.fetchall()
             return [dict(item) for item in items]
             
         except Exception as e:
             raise Exception(f"Error fetching inventory by category: {e}")
+        finally:
+            if cursor:
+                cursor.close()
     
     def search_available_resources(self, user_id: str) -> List[Dict]:
         """
