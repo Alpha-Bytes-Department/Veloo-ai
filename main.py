@@ -62,7 +62,7 @@ async def generate_offer(request: offerRequest):
     """Generate a new offer using AI"""
     try:
         # Generate offer using AI
-        offer = await generator.generate_offer(request)
+        offer = generator.generate_offer(request)
         
         # Save to database with user_id
         offer_id = database.save_offer(offer, request.user_id)
@@ -192,7 +192,7 @@ async def update_offer(request: UpdateofferRequest):
         )
         
         # Use the generator's update_offer method
-        updated_offer = await generator.update_offer(
+        updated_offer = generator.update_offer(
             user_message=request.user_message,
             update_request=existing_final_offer
         )
@@ -213,7 +213,7 @@ async def update_offer(request: UpdateofferRequest):
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
 
-@app.put("/offers/{offer_id}/materials-ordered")
+@app.put("/offers/materials-ordered")
 async def toggle_materials_ordered(offer_id: str):
     """Toggle the materials_ordered status of a offer"""
     try:
@@ -425,4 +425,4 @@ async def send_email(request: Email):
 
 if __name__ == "__main__":
     import uvicorn
-    uvicorn.run("main:app", host="0.0.0.0", port=8000, reload=True)
+    uvicorn.run("main:app", host="0.0.0.0", port=8000, reload=True)   
