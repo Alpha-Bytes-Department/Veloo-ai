@@ -54,7 +54,7 @@ class Generator:
             # Search inventory items based on the query
             items = self.database.search_inventory_items(
                 search_term=query,
-                is_active=True,
+                active=True,
                 limit=50
             )
             
@@ -68,14 +68,13 @@ class Generator:
             formatted_items = []
             for item in items:
                 formatted_items.append({
+                    "id": item.get("id"),
                     "name": item.get("name"),
                     "category": item.get("category"),
                     "description": item.get("description", ""),
-                    "unit": item.get("unit"),
-                    "unit_price": item.get("unit_price"),
-                    "quantity_available": item.get("quantity_available"),
-                    "supplier": item.get("supplier", ""),
-                    "sku": item.get("sku", "")
+                    "brand": item.get("brand", ""),
+                    "default_price": float(item.get("default_price", 0)),
+                    "active": item.get("active", True)
                 })
             
             return {
