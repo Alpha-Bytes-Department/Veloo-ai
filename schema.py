@@ -44,6 +44,7 @@ class UpdateofferRequest(BaseModel):
 
 class SaveUpdatedOffer(Finaloffer):
     offer_id: str
+    user_id: str
 
 # Inventory/Materials Schemas
 class InventoryItem(BaseModel):
