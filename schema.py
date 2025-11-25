@@ -31,7 +31,7 @@ class Finaloffer(BaseModel):
     address: str
     task_description: str 
     bill_of_materials: List[Materials]
-    time: str
+    time: Literal["ASAP", "1-3 Weeks", "3 months", "6 months", "1 Year", "other"]
     resource: str  # Name of the available worker assigned to the task
     status: Literal["Pending", "Accepted", "Rejected"] = "Pending" 
     price: PriceDetail
@@ -41,6 +41,9 @@ class Finaloffer(BaseModel):
 class UpdateofferRequest(BaseModel):
     offer_id: str
     user_message: str
+
+class SaveUpdatedOffer(Finaloffer):
+    offer_id: str
 
 # Inventory/Materials Schemas
 class InventoryItem(BaseModel):
