@@ -33,7 +33,7 @@ class Finaloffer(BaseModel):
     bill_of_materials: List[Materials]
     time: Literal["ASAP", "1-3 Weeks", "3 months", "6 months", "1 Year", "other"]
     resource: str  # Name of the available worker assigned to the task
-    status: Literal["Pending", "Accepted", "Rejected"] = "Pending" 
+    status: Literal["Pending", "Accepted", "Done"] = "Pending" 
     price: PriceDetail
     timestamp: Optional[datetime] = None
     materials_ordered: bool = False  # Default to False if not specified
