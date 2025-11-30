@@ -1,7 +1,7 @@
 import psycopg2
 from psycopg2.extras import RealDictCursor, Json
 from typing import List, Optional, Dict
-from datetime import datetime
+from datetime import datetime, date
 import os
 from dotenv import load_dotenv
 from schema import Finaloffer, InventoryItem
@@ -64,7 +64,7 @@ class Database:
                     status TEXT DEFAULT 'Pending',
                     price JSONB,
                     user_id TEXT NOT NULL,
-                    timestamp TIMESTAMP,
+                    project_start DATE,
                     materials_ordered BOOLEAN DEFAULT FALSE,
                     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
                     updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
@@ -141,12 +141,12 @@ class Database:
             
             # Add timestamps
             created_at = datetime.now()
-            timestamp = offer_dict.get("timestamp") or datetime.now()
+            project_start = offer_dict.get("project_start")
             
             cursor.execute("""
                 INSERT INTO offers (
                     customer_name, phone_number, address, task_description,
-                    bill_of_materials, time, resource, status, price, user_id, timestamp, materials_ordered, created_at
+                    bill_of_materials, time, resource, status, price, user_id, project_start, materials_ordered, created_at
                 )
                 VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
                 RETURNING id
@@ -161,7 +161,7 @@ class Database:
                 offer_dict.get("status", "Pending"),
                 Json(offer_dict["price"]),
                 user_id,
-                timestamp,
+                project_start,
                 offer_dict.get("materials_ordered", False),
                 created_at
             ))
@@ -267,6 +267,29 @@ class Database:
             if cursor:
                 cursor.close()
     
+    def get_offers_by_date(self, user_id: str, start_date: date, end_date: date) -> List[Dict]:
+        """Get all offers for a specific user within a date range based on project_start"""
+        cursor = None
+        try:
+            self.connect()
+            cursor = self.get_cursor()
+            
+            cursor.execute("""
+                SELECT * FROM offers 
+                WHERE user_id = %s 
+                AND project_start BETWEEN %s AND %s
+                ORDER BY project_start DESC
+            """, (user_id, start_date, end_date))
+            
+            offers = cursor.fetchall()
+            return [dict(offer) for offer in offers]
+            
+        except Exception as e:
+            raise Exception(f"Error fetching offers by date: {e}")
+        finally:
+            if cursor:
+                cursor.close()
+    
     def delete_offer(self, offer_id: str) -> bool:
         """Delete an offer by ID"""
         cursor = None
@@ -300,7 +323,7 @@ class Database:
             # Convert Pydantic model to dict
             update_data = offer.dict()
             
-            timestamp = update_data.get("timestamp") or datetime.now()
+            project_start = update_data.get("project_start")
             updated_at = datetime.now()
             
             cursor.execute("""
@@ -315,7 +338,7 @@ class Database:
                     status = %s,
                     price = %s,
                     user_id = %s,
-                    timestamp = %s,
+                    project_start = %s,
                     materials_ordered = %s,
                     updated_at = %s
                 WHERE id = %s
@@ -330,7 +353,7 @@ class Database:
                 update_data.get("status", "Pending"),
                 Json(update_data["price"]),
                 user_id,
-                timestamp,
+                project_start,
                 update_data.get("materials_ordered", False),
                 updated_at,
                 offer_id
