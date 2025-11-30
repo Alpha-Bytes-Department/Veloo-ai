@@ -393,6 +393,51 @@ class Database:
             if cursor:
                 cursor.close()
     
+    def toggle_order_status(self, offer_id: str, status: str) -> Dict:
+        """Update the status of an offer (Pending, Accepted, Done)"""
+        cursor = None
+        try:
+            self.connect()
+            cursor = self.get_cursor()
+            
+            # Validate status value
+            valid_statuses = ["Pending", "Accepted", "Done"]
+            if status not in valid_statuses:
+                raise Exception(f"Invalid status. Must be one of: {', '.join(valid_statuses)}")
+            
+            # Check if offer exists
+            cursor.execute("""
+                SELECT id FROM offers WHERE id = %s
+            """, (offer_id,))
+            
+            offer = cursor.fetchone()
+            if not offer:
+                raise Exception("offer not found")
+            
+            # Update the offer status
+            cursor.execute("""
+                UPDATE offers SET 
+                    status = %s,
+                    updated_at = %s
+                WHERE id = %s
+            """, (status, datetime.now(), offer_id))
+            
+            self.conn.commit()
+            
+            return {
+                "success": True,
+                "offer_id": offer_id,
+                "status": status
+            }
+        
+        except Exception as e:
+            if self.conn:
+                self.conn.rollback()
+            raise Exception(f"Error updating offer status: {e}")
+        finally:
+            if cursor:
+                cursor.close()
+    
     def toggle_materials_ordered(self, offer_id: str) -> Dict:
         """Toggle the materials_ordered status of an offer"""
         cursor = None
