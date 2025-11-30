@@ -1,6 +1,6 @@
 from pydantic import BaseModel, Field
 from typing import List, Optional, Literal
-from datetime import datetime
+from datetime import datetime, date
 
 class PriceDetail(BaseModel):
     Materials: float
@@ -11,11 +11,10 @@ class offerRequest(BaseModel):
     customer_name: str
     phone_number: str
     address: str
-    project_start: str
+    project_start: date
     select_task: str
     explaination: str
     user_id: str
-    timestamp: Optional[datetime] = None
 
 class Materials(BaseModel):
     category: str
@@ -31,11 +30,11 @@ class Finaloffer(BaseModel):
     address: str
     task_description: str 
     bill_of_materials: List[Materials]
-    time: Literal["ASAP", "1-3 Weeks", "3 months", "6 months", "1 Year", "other"]
+    time: str
     resource: str  # Name of the available worker assigned to the task
     status: Literal["Pending", "Accepted", "Done"] = "Pending" 
     price: PriceDetail
-    timestamp: Optional[datetime] = None
+    project_start: date
     materials_ordered: bool = False  # Default to False if not specified
 
 class UpdateofferRequest(BaseModel):
@@ -49,6 +48,11 @@ class UpdateStatus(BaseModel):
 class SaveUpdatedOffer(Finaloffer):
     offer_id: str
     user_id: str
+
+class OfferByDate(BaseModel):
+    user_id: str
+    start_date: date
+    end_date: date
 
 # Inventory/Materials Schemas
 class InventoryItem(BaseModel):
