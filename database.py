@@ -21,6 +21,7 @@ class Database:
         try:
             if self.conn is None or self.conn.closed:
                 self.conn = psycopg2.connect(self.connection_string)
+                self.conn.autocommit = True
                 print("Successfully connected to PostgreSQL")
             
         except Exception as e:
@@ -388,8 +389,8 @@ class Database:
             if cursor:
                 cursor.close()
     
-    def search_offers(self, search_term: str, limit: int = 100) -> List[Dict]:
-        """Search offers by text across multiple fields"""
+    def search_offers(self, search_term: str, user_id: str, limit: int = 100) -> List[Dict]:
+        """Search offers by text across multiple fields for a specific user"""
         cursor = None
         try:
             self.connect()
@@ -399,13 +400,14 @@ class Database:
             
             cursor.execute("""
                 SELECT * FROM offers 
-                WHERE customer_name ILIKE %s 
+                WHERE user_id = %s
+                  AND (customer_name ILIKE %s 
                    OR phone_number ILIKE %s 
                    OR address ILIKE %s 
-                   OR task_description ILIKE %s
+                   OR task_description ILIKE %s)
                 ORDER BY created_at DESC 
                 LIMIT %s
-            """, (search_pattern, search_pattern, search_pattern, search_pattern, limit))
+            """, (user_id, search_pattern, search_pattern, search_pattern, search_pattern, limit))
             
             offers = cursor.fetchall()
             return [dict(offer) for offer in offers]
