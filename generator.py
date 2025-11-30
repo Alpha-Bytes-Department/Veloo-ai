@@ -53,8 +53,21 @@ class Generator:
 
         self.system_prompt = """You are a professional offer generator assistant. 
         Generate detailed construction/service offers based on customer requirements.
-        Provide comprehensive bill of materials, time estimates, and accurate pricing.
-        Assign an available worker name to the 'resource' field by using the search_available_resources tool.
+        
+        Your response MUST include ALL of these fields:
+        - customer_name: Use the exact customer name provided
+        - phone_number: Use the exact phone number provided
+        - address: Use the exact address provided
+        - task_description: Detailed description of the work to be done
+        - bill_of_materials: Array of materials needed (each with category, material, price, description, unit, quantity)
+        - time: Estimated completion time.
+        - resource: Name of the assigned worker (use search_available_resources tool to get available workers)
+        - status: Default to "Pending"
+        - price: Object with Materials (float), Labor (float), and Total (float)
+        - project_start: Use the exact project start date provided
+        - materials_ordered: Default to false
+        
+        Provide comprehensive bill of materials, accurate time estimates, and realistic pricing.
         Format your response as a structured offer with all required fields."""
 
     def get_inventory_data(self, query: str) -> Dict:
@@ -147,17 +160,17 @@ class Generator:
             Project Start Date: {offer_request.project_start}
             Task Selected: {offer_request.select_task}
             Additional Details: {offer_request.explaination}
-            Time: {datetime.now().isoformat()}
             User ID: {offer_request.user_id}
-            Materials Ordered: False (Set by default)
-            Offer status: Set to "Pending" by default
+            Project_start: {offer_request.project_start} (MUST use this exact date)
+            Status: "Pending"
+            Materials_ordered: false
             
             Please provide:
-            1. Detailed task description
-            2. Complete bill of materials with quantities and costs
-            3. Time estimate for completion
-            4. Available worker name (use search_available_resources tool to find and assign a worker name to the 'resource' field)
-            5. Total price breakdown
+            1. Detailed task_description based on the task selected and explanation
+            2. Complete bill_of_materials with category, material name, price, description, unit, and quantity
+            3. Time estimate for completion.
+            4. Available worker name in the 'resource' field (use search_available_resources tool to find and assign a worker)
+            5. Total price breakdown with Materials, Labor, and Total in the 'price' field
             """
             
             # Create messages for chat completion
@@ -235,18 +248,29 @@ class Generator:
         try:
             # Create a detailed prompt from the request data
             user_input = f"""
-            Generate a professional offer for the following customer:
+            Update the following professional offer based on the user's request:
             
-            Customer Name: {update_request.customer_name}
-            Phone: {update_request.phone_number}
-            Address: {update_request.address}
-            Task Description: {update_request.task_description}
-            Bill of Materials: {update_request.bill_of_materials}
-            Time: {update_request.time}
-            Price: {update_request.price}
+            Current Offer Details:
+            - Customer Name: {update_request.customer_name}
+            - Phone: {update_request.phone_number}
+            - Address: {update_request.address}
+            - Task Description: {update_request.task_description}
+            - Bill of Materials: {update_request.bill_of_materials}
+            - Time: {update_request.time}
+            - Resource: {update_request.resource}
+            - Status: {update_request.status}
+            - Project Start Date: {update_request.project_start}
+            - Price: {update_request.price}
+            - Materials Ordered: {update_request.materials_ordered}
             
-            Please update the offer as per user request:
+            User's Update Request:
             {user_message}
+            
+            IMPORTANT: 
+            - Keep all fields that are not mentioned in the update request unchanged
+            - Maintain the exact project_start date unless explicitly asked to change it
+            - Ensure all required fields are present in the updated offer
+            - Return a complete Finaloffer object with all fields
             """
             
             messages = [
