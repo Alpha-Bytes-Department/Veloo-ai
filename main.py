@@ -1,7 +1,7 @@
 from fastapi import FastAPI, HTTPException, Depends, Request
 from fastapi.middleware.cors import CORSMiddleware
 from typing import List, Optional
-from datetime import datetime
+from datetime import datetime, date
 from contextlib import asynccontextmanager
 import json
 
@@ -134,17 +134,17 @@ async def save_offer(request: SaveUpdatedOffer):
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
 
-@app.get("/offers", response_model=List[dict])
-async def get_all_offers(
-    limit: Optional[int] = 100,
-    offset: Optional[int] = 0
-):
-    """Get all offers with pagination"""
-    try:
-        offers = database.get_all_offers(limit=limit, offset=offset)
-        return offers
-    except Exception as e:
-        raise HTTPException(status_code=500, detail=str(e))
+# @app.get("/offers", response_model=List[dict])
+# async def get_all_offers(
+#     limit: Optional[int] = 100,
+#     offset: Optional[int] = 0
+# ):
+#     """Get all offers with pagination"""
+#     try:
+#         offers = database.get_all_offers(limit=limit, offset=offset)
+#         return offers
+#     except Exception as e:
+#         raise HTTPException(status_code=500, detail=str(e))
 
 @app.get("/offers/{offer_id}")
 async def get_offer(offer_id: str):
@@ -201,20 +201,20 @@ async def get_offers_by_user(user_id: str):
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
 
-@app.get("/offers/date/")
-async def get_offers_by_date(request: OfferByDate):
+@app.get("/offers-date")
+async def get_offers_by_date(user_id: str, start_date: date, end_date: date):
     """Get all offers for a specific date"""
     try:
-        offers = database.get_offers_by_date(request.user_id, request.start_date, request.end_date)
+        offers = database.get_offers_by_date(user_id, start_date, end_date)
         return offers
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
 
 @app.get("/offers/search/{search_term}")
-async def search_offers(search_term: str, limit: Optional[int] = 100):
-    """Search offers by text across multiple fields"""
+async def search_offers(search_term: str, user_id: str, limit: Optional[int] = 100):
+    """Search offers by text across multiple fields for a specific user"""
     try:
-        offers = database.search_offers(search_term, limit)
+        offers = database.search_offers(search_term, user_id, limit)
         return offers
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
