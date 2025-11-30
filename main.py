@@ -183,14 +183,14 @@ async def delete_offer(offer_id: str):
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
 
-@app.get("/offers/customer/{customer_name}")
-async def get_offers_by_customer(customer_name: str):
-    """Get all offers for a specific customer"""
-    try:
-        offers = database.get_offers_by_customer(customer_name)
-        return offers
-    except Exception as e:
-        raise HTTPException(status_code=500, detail=str(e))
+# @app.get("/offers/customer/{customer_name}")
+# async def get_offers_by_customer(customer_name: str):
+#     """Get all offers for a specific customer"""
+#     try:
+#         offers = database.get_offers_by_customer(customer_name)
+#         return offers
+#     except Exception as e:
+#         raise HTTPException(status_code=500, detail=str(e))
 
 @app.get("/offers/user/{user_id}")
 async def get_offers_by_user(user_id: str):
@@ -219,14 +219,14 @@ async def search_offers(search_term: str, user_id: str, limit: Optional[int] = 1
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
 
-@app.get("/offers/count")
-async def get_offers_count():
-    """Get total count of offers"""
-    try:
-        count = database.get_offers_count()
-        return {"total_offers": count}
-    except Exception as e:
-        raise HTTPException(status_code=500, detail=str(e))
+# @app.get("/offers/count")
+# async def get_offers_count():
+#     """Get total count of offers"""
+#     try:
+#         count = database.get_offers_count()
+#         return {"total_offers": count}
+#     except Exception as e:
+#         raise HTTPException(status_code=500, detail=str(e))
 
 @app.put("/offers/update", response_model=dict)
 async def update_offer(request: UpdateofferRequest):
