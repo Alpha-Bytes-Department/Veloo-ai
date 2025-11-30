@@ -42,6 +42,10 @@ class UpdateofferRequest(BaseModel):
     offer_id: str
     user_message: str
 
+class UpdateStatus(BaseModel):
+    offer_id: str
+    status: Literal["Pending", "Accepted", "Done"]
+
 class SaveUpdatedOffer(Finaloffer):
     offer_id: str
     user_id: str
