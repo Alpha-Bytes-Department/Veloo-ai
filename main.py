@@ -11,6 +11,7 @@ from schema import (
     UpdateofferRequest,
     SaveUpdatedOffer,
     UpdateStatus,
+    OfferByDate,
     InventoryItem,
     InventoryItemUpdate,
     InventorySearchQuery,
@@ -200,6 +201,15 @@ async def get_offers_by_user(user_id: str):
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
 
+@app.get("/offers/date/")
+async def get_offers_by_date(request: OfferByDate):
+    """Get all offers for a specific date"""
+    try:
+        offers = database.get_offers_by_date(request.user_id, request.start_date, request.end_date)
+        return offers
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
 @app.get("/offers/search/{search_term}")
 async def search_offers(search_term: str, limit: Optional[int] = 100):
     """Search offers by text across multiple fields"""
@@ -241,7 +251,7 @@ async def update_offer(request: UpdateofferRequest):
             resource=existing_offer.get("resource", ""),
             status=existing_offer.get("status", "Pending"),
             price=existing_offer.get("price", ""),
-            timestamp=existing_offer.get("timestamp"),
+            project_start=existing_offer.get("project_start"),
             materials_ordered=existing_offer.get("materials_ordered", False)
         )
         
