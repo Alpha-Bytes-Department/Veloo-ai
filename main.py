@@ -10,6 +10,7 @@ from schema import (
     Finaloffer, 
     UpdateofferRequest,
     SaveUpdatedOffer,
+    UpdateStatus,
     InventoryItem,
     InventoryItemUpdate,
     InventorySearchQuery,
@@ -264,6 +265,21 @@ async def update_offer(request: UpdateofferRequest):
     except HTTPException:
         raise
     except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+@app.put("/offers/toggle-status")
+async def toggle_offer_status(request: UpdateStatus):
+    """Toggle the status of an offer (Pending, Accepted, Done)"""
+    try:
+        result = database.toggle_order_status(request.offer_id, request.status)
+        return {
+            "message": "Status updated successfully",
+            "offer_id": result["offer_id"],
+            "status": result["status"]
+        }
+    except Exception as e:
+        if "not found" in str(e).lower():
+            raise HTTPException(status_code=404, detail="offer not found")
         raise HTTPException(status_code=500, detail=str(e))
 
 @app.put("/offers/materials-ordered")
