@@ -247,6 +247,7 @@ async def update_offer(request: UpdateofferRequest):
             customer_name=existing_offer.get("customer_name", ""),
             phone_number=existing_offer.get("phone_number", ""),
             address=existing_offer.get("address", ""),
+            customer_email=existing_offer.get("customer_email", ""),
             task_description=existing_offer.get("task_description", ""),
             bill_of_materials=existing_offer.get("bill_of_materials", ""),
             time=existing_offer.get("time", ""),
