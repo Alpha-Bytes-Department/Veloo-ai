@@ -112,3 +112,7 @@ class Supplier(BaseModel):
 
 class Suppliers(BaseModel):
     suppliers: List[Supplier]
+
+class SupplierEmailRequest(BaseModel):
+    supplier_id: str = Field(..., description="ID of the supplier")
+    offer_id: str = Field(..., description="ID of the offer")

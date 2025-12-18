@@ -198,6 +198,90 @@ class EmailManager:
         except Exception as e:
             raise Exception(f"Error generating custom mail: {str(e)}")
 
+    def generate_supplier_email(self, supplier: Dict, offer: Dict) -> EmailResponse:
+        """
+        Generate professional email content for a supplier to request materials.
+        
+        Args:
+            supplier: Dictionary containing the supplier details
+            offer: Dictionary containing the offer details with bill of materials
+            
+        Returns:
+            EmailResponse with supplier_email, email_subject, and email_body
+        """
+        try:
+            # Extract supplier details
+            supplier_name = supplier.get("supplier_name", "Supplier")
+            supplier_email = supplier.get("supplier_email", "N/A")
+            
+            # Extract offer details
+            task_description = offer.get("task_description", "N/A")
+            bill_of_materials = offer.get("bill_of_materials", [])
+            project_start = offer.get("project_start", "To be confirmed")
+            time_estimate = offer.get("time", "N/A")
+            
+            # Format bill of materials for the email
+            materials_text = ""
+            if bill_of_materials:
+                for idx, material in enumerate(bill_of_materials, 1):
+                    materials_text += f"\n{idx}. {material.get('material', 'N/A')} - {material.get('category', 'N/A')}"
+                    materials_text += f"\n   Quantity: {material.get('quantity', 'N/A')} {material.get('unit', '')}"
+                    if material.get('description'):
+                        materials_text += f"\n   Description: {material.get('description')}"
+                    materials_text += "\n"
+            
+            # Create prompt for AI to generate supplier email
+            email_prompt = f"""
+                Generate a professional business email to send to a material supplier to order/request materials.
+
+                Supplier Details:
+                - Supplier Name: {supplier_name}
+                - Supplier Email: {supplier_email}
+
+                Order Details:
+                - Materials needed by: {project_start}
+
+                Materials Required:
+                {materials_text}
+
+                The email should:
+                1. Be professional and formal in tone
+                2. Clearly state the purpose - ordering/requesting materials
+                3. List all required materials with quantities in a clear, organized format
+                4. Specify when the materials are needed
+                5. Request pricing/quotation and availability
+                6. Ask about delivery options and lead times
+                7. Request confirmation of the order or a response
+                8. End with a professional closing
+
+                Generate both an email subject line and the complete email body.
+                The email should be formatted in a clean, readable way with proper sections and spacing.
+                """
+            
+            messages = [
+                {
+                    "role": "system", 
+                    "content": "You are a professional business communication specialist. Generate clear, formal, and supplier-friendly email content for ordering materials. Use proper formatting with line breaks and sections for readability."
+                },
+                {"role": "user", "content": email_prompt}
+            ]
+            
+            # Call OpenAI API to generate email content
+            response = self.client.beta.chat.completions.parse(
+                model="gpt-4o-mini",
+                messages=messages,
+                response_format=EmailResponse,
+            )
+            
+            email_response = response.choices[0].message.parsed
+            
+            return email_response
+        
+        except Exception as e:
+            raise Exception(f"Error generating supplier email content: {str(e)}")
+            
+
+
     def send_email(self, email_request: Email):
         sender_email = os.getenv("SENDER_EMAIL")
         sender_password = os.getenv("SENDER_EMAIL_PASSWORD")

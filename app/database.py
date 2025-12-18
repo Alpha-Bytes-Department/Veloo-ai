@@ -801,8 +801,8 @@ class Database:
     
     # ==================== SUPPLIER MANAGEMENT METHODS ====================
     
-    def get_all_suppliers(self) -> List[Dict]:
-        """Get all suppliers from the supplychain_supplier table"""
+    def get_suppliers(self, user_id: str) -> List[Dict]:
+        """Get suppliers from the supplychain_supplier table filtered by supervisor_id"""
         cursor = None
         try:
             self.connect()
@@ -811,11 +811,35 @@ class Database:
             cursor.execute("""
                 SELECT id, supplier_name, supplier_email 
                 FROM supplychain_supplier 
+                WHERE supervisor_id = %s
                 ORDER BY supplier_name ASC
-            """)
+            """, (user_id,))
             
             suppliers = cursor.fetchall()
             return [dict(supplier) for supplier in suppliers]
+            
+        except Exception as e:
+            raise Exception(f"Error fetching suppliers: {e}")
+        finally:
+            if cursor:
+                cursor.close()
+
+
+    def get_supplier_by_id(self, supplier_id: str) -> Dict:
+        """Get supplier from the supplychain_supplier table filtered by supplier_id"""
+        cursor = None
+        try:
+            self.connect()
+            cursor = self.get_cursor()
+            
+            cursor.execute("""
+                SELECT id, supplier_name, supplier_email 
+                FROM supplychain_supplier 
+                WHERE id = %s
+            """, (supplier_id,))
+            
+            supplier = cursor.fetchone()
+            return dict(supplier)
             
         except Exception as e:
             raise Exception(f"Error fetching suppliers: {e}")
