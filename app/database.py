@@ -781,23 +781,29 @@ class Database:
     
     def search_available_resources(self, user_id: str) -> List[Dict]:
         """
-        Search for available manpower resources for a specific user.
-        Currently returns placeholder data with names.
-        TODO: Complete implementation with proper resources table and availability slots.
+        Search for available manpower resources for a specific supervisor/user.
+        Queries the supplychain_resource table filtered by supervisor_id.
         """
+        cursor = None
         try:
-            # Placeholder implementation - returns sample resource data
-            # This will be replaced with actual database query when resources table is created
-            placeholder_resources = [
-                {"John Doe": "Resource 1"},
-                {"Istiaque Ahmed": "Resource 2"},
-                {"Aber Islam": "Resource 3"}
-            ]
+            self.connect()
+            cursor = self.get_cursor()
             
-            return placeholder_resources
+            cursor.execute("""
+                SELECT name
+                FROM supplychain_resource
+                WHERE supervisor_id = %s
+                ORDER BY name ASC
+            """, (user_id,))
+            
+            resources = cursor.fetchall()
+            return [dict(resource) for resource in resources]
             
         except Exception as e:
             raise Exception(f"Error fetching available resources: {e}")
+        finally:
+            if cursor:
+                cursor.close()
     
     # ==================== SUPPLIER MANAGEMENT METHODS ====================
     
