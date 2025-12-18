@@ -825,7 +825,7 @@ class Database:
                 cursor.close()
 
 
-    def get_supplier_by_id(self, supplier_id: str) -> Dict:
+    def get_supplier_by_id(self, supplier_id: str) -> Optional[Dict]:
         """Get supplier from the supplychain_supplier table filtered by supplier_id"""
         cursor = None
         try:
@@ -839,10 +839,12 @@ class Database:
             """, (supplier_id,))
             
             supplier = cursor.fetchone()
-            return dict(supplier)
+            if supplier:
+                return dict(supplier)
+            return None
             
         except Exception as e:
-            raise Exception(f"Error fetching suppliers: {e}")
+            raise Exception(f"Error fetching supplier: {e}")
         finally:
             if cursor:
                 cursor.close()
