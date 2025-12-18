@@ -30,6 +30,7 @@ class EmailManager:
         try:
             # Extract offer details
             customer_name = offer.get("customer_name", "Valued Customer")
+            customer_email = offer.get("customer_email", "N/A")
             phone_number = offer.get("phone_number", "N/A")
             address = offer.get("address", "N/A")
             task_description = offer.get("task_description", "N/A")
@@ -61,6 +62,7 @@ class EmailManager:
 
                 Customer Details:
                 - Name: {customer_name}
+                - Email: {customer_email}
                 - Phone: {phone_number}
                 - Address: {address}
 
@@ -120,6 +122,7 @@ class EmailManager:
             # Extract offer details
             customer_name = offer.get("customer_name", "Valued Customer")
             phone_number = offer.get("phone_number", "N/A")
+            customer_email = offer.get("customer_email", "N/A")
             address = offer.get("address", "N/A")
             task_description = offer.get("task_description", "N/A")
             time_estimate = offer.get("time", "N/A")
@@ -135,6 +138,7 @@ class EmailManager:
 
             Customer Details:
             - Name: {customer_name}
+            - Email: {customer_email}
             - Phone: {phone_number}
             - Address: {address}
 
@@ -183,11 +187,11 @@ class EmailManager:
 
     def generate_custom_email(self, offer: Dict) -> EmailResponse:
         try:
-            Customer_name = offer.get("customer_name", "Valued Customer")
+            Customer_email = offer.get("customer_email", "N/A")
             Subject = ""
             Body = ""
             return EmailResponse(
-                customer_name=Customer_name,
+                customer_email=Customer_email,
                 email_subject=Subject,
                 email_body=Body
             )

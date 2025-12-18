@@ -11,6 +11,7 @@ class offerRequest(BaseModel):
     customer_name: str
     phone_number: str
     address: str
+    customer_email: str
     project_start: date
     select_task: str
     explaination: str
@@ -24,10 +25,22 @@ class Materials(BaseModel):
     unit: str	
     quantity: str
 
+class GeneratedOfferContent(BaseModel):
+    """AI-generated offer content without customer personal information."""
+    task_description: str 
+    bill_of_materials: List[Materials]
+    time: str
+    resource: str  # Name of the available worker assigned to the task
+    status: Literal["Pending", "Accepted", "Done"] = "Pending" 
+    price: PriceDetail
+    project_start: date
+    materials_ordered: bool = False  # Default to False if not specified
+
 class Finaloffer(BaseModel):
     customer_name: str
     phone_number: str
     address: str
+    customer_email: str
     task_description: str 
     bill_of_materials: List[Materials]
     time: str
@@ -83,7 +96,7 @@ class EmailRequest(BaseModel):
     offer_id: str = Field(..., description="ID of the offer to generate email for")
 
 class EmailResponse(BaseModel):
-    customer_name: str = Field(..., description="Name of the customer")
+    customer_email: str = Field(..., description="Email of the customer")
     email_subject: str = Field(..., description="Email subject line")
     email_body: str = Field(..., description="Email body content")
 
@@ -92,4 +105,10 @@ class Email(BaseModel):
     subject: str = Field(..., description="Email subject line")
     body: str = Field(..., description="Email body content")
 
+class Supplier(BaseModel):
+    supplier_id: str = Field(..., description="ID of the supplier")
+    supplier_name: str = Field(..., description="Name of the supplier")
+    supplier_email: str = Field(..., description="Email of the supplier")
 
+class Suppliers(BaseModel):
+    suppliers: List[Supplier]

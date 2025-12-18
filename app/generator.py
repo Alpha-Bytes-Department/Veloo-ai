@@ -2,7 +2,7 @@ from openai import OpenAI
 from typing import List, Dict
 import os
 import json
-from schema import offerRequest, Finaloffer, EmailRequest, EmailResponse
+from schema import offerRequest, Finaloffer, GeneratedOfferContent, EmailRequest, EmailResponse
 from dotenv import load_dotenv
 from datetime import datetime
 
@@ -52,12 +52,9 @@ class Generator:
         ]
 
         self.system_prompt = """You are a professional offer generator assistant. 
-        Generate detailed construction/service offers based on customer requirements.
+        Generate detailed construction/service offers based on project requirements.
         
         Your response MUST include ALL of these fields:
-        - customer_name: Use the exact customer name provided
-        - phone_number: Use the exact phone number provided
-        - address: Use the exact address provided
         - task_description: Detailed description of the work to be done
         - bill_of_materials: Array of materials needed (each with category, material, price, description, unit, quantity)
         - time: Estimated completion time.
@@ -151,12 +148,10 @@ class Generator:
     def generate_offer(self, offer_request: offerRequest) -> Finaloffer:
         try:
             # Create a detailed prompt from the request data
+            # NOTE: Customer personal info (name, phone, address) is NOT sent to the AI
             user_input = f"""
-            Generate a professional offer for the following customer:
+            Generate a professional offer for the following project:
             
-            Customer Name: {offer_request.customer_name}
-            Phone: {offer_request.phone_number}
-            Address: {offer_request.address}
             Project Start Date: {offer_request.project_start}
             Task Selected: {offer_request.select_task}
             Additional Details: {offer_request.explaination}
@@ -220,23 +215,39 @@ class Generator:
                             "content": json.dumps(resources_data)
                         })
                 
-                # 5. Get final response with tool results
+                # 5. Get final response with tool results (using GeneratedOfferContent - no personal info)
                 final_response = self.client.beta.chat.completions.parse(
                     model="gpt-4o-mini",
                     messages=messages,
-                    response_format=Finaloffer,
+                    response_format=GeneratedOfferContent,
                 )
                 
-                offer = final_response.choices[0].message.parsed
+                generated_content = final_response.choices[0].message.parsed
             else:
-                # No tool calls, parse the response directly
+                # No tool calls, parse the response directly (using GeneratedOfferContent - no personal info)
                 final_response = self.client.beta.chat.completions.parse(
                     model="gpt-4o-mini",
                     messages=messages,
-                    response_format=Finaloffer,
+                    response_format=GeneratedOfferContent,
                 )
                 
-                offer = final_response.choices[0].message.parsed
+                generated_content = final_response.choices[0].message.parsed
+            
+            # Merge AI-generated content with customer personal information locally
+            offer = Finaloffer(
+                customer_name=offer_request.customer_name,
+                phone_number=offer_request.phone_number,
+                address=offer_request.address,
+                customer_email=offer_request.customer_email,
+                task_description=generated_content.task_description,
+                bill_of_materials=generated_content.bill_of_materials,
+                time=generated_content.time,
+                resource=generated_content.resource,
+                status=generated_content.status,
+                price=generated_content.price,
+                project_start=generated_content.project_start,
+                materials_ordered=generated_content.materials_ordered
+            )
             
             return offer
         
@@ -247,13 +258,11 @@ class Generator:
     def update_offer(self, user_message: str, update_request: Finaloffer) -> Finaloffer:
         try:
             # Create a detailed prompt from the request data
+            # NOTE: Customer personal info (name, phone, address) is NOT sent to the AI
             user_input = f"""
             Update the following professional offer based on the user's request:
             
             Current Offer Details:
-            - Customer Name: {update_request.customer_name}
-            - Phone: {update_request.phone_number}
-            - Address: {update_request.address}
             - Task Description: {update_request.task_description}
             - Bill of Materials: {update_request.bill_of_materials}
             - Time: {update_request.time}
@@ -270,7 +279,7 @@ class Generator:
             - Keep all fields that are not mentioned in the update request unchanged
             - Maintain the exact project_start date unless explicitly asked to change it
             - Ensure all required fields are present in the updated offer
-            - Return a complete Finaloffer object with all fields
+            - Return a complete offer object with all fields
             """
             
             messages = [
@@ -278,13 +287,30 @@ class Generator:
                 {"role": "user", "content": user_input}
             ]
             
+            # Use GeneratedOfferContent to avoid sending/receiving personal info
             response = self.client.beta.chat.completions.parse(
                 model="gpt-4o-mini",
                 messages=messages,
-                response_format=Finaloffer,
+                response_format=GeneratedOfferContent,
             )
             
-            offer = response.choices[0].message.parsed
+            generated_content = response.choices[0].message.parsed
+            
+            # Merge AI-generated content with customer personal information from original request
+            offer = Finaloffer(
+                customer_name=update_request.customer_name,
+                phone_number=update_request.phone_number,
+                address=update_request.address,
+                customer_email=update_request.customer_email,
+                task_description=generated_content.task_description,
+                bill_of_materials=generated_content.bill_of_materials,
+                time=generated_content.time,
+                resource=generated_content.resource,
+                status=generated_content.status,
+                price=generated_content.price,
+                project_start=generated_content.project_start,
+                materials_ordered=generated_content.materials_ordered
+            )
             
             return offer
         

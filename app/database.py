@@ -58,6 +58,7 @@ class Database:
                     customer_name TEXT NOT NULL,
                     phone_number TEXT NOT NULL,
                     address TEXT NOT NULL,
+                    customer_email TEXT,
                     task_description TEXT,
                     bill_of_materials JSONB,
                     time TEXT,
@@ -146,15 +147,16 @@ class Database:
             
             cursor.execute("""
                 INSERT INTO offers (
-                    customer_name, phone_number, address, task_description,
+                    customer_name, phone_number, address, customer_email, task_description,
                     bill_of_materials, time, resource, status, price, user_id, project_start, materials_ordered, created_at
                 )
-                VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
+                VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
                 RETURNING id
             """, (
                 offer_dict["customer_name"],
                 offer_dict["phone_number"],
                 offer_dict["address"],
+                offer_dict.get("customer_email", ""),
                 offer_dict["task_description"],
                 Json(offer_dict["bill_of_materials"]),
                 offer_dict["time"],
@@ -332,6 +334,7 @@ class Database:
                     customer_name = %s,
                     phone_number = %s,
                     address = %s,
+                    customer_email = %s,
                     task_description = %s,
                     bill_of_materials = %s,
                     time = %s,
@@ -347,6 +350,7 @@ class Database:
                 update_data["customer_name"],
                 update_data["phone_number"],
                 update_data["address"],
+                update_data.get("customer_email", ""),
                 update_data["task_description"],
                 Json(update_data["bill_of_materials"]),
                 update_data["time"],
@@ -794,5 +798,29 @@ class Database:
             
         except Exception as e:
             raise Exception(f"Error fetching available resources: {e}")
+    
+    # ==================== SUPPLIER MANAGEMENT METHODS ====================
+    
+    def get_all_suppliers(self) -> List[Dict]:
+        """Get all suppliers from the supplychain_supplier table"""
+        cursor = None
+        try:
+            self.connect()
+            cursor = self.get_cursor()
+            
+            cursor.execute("""
+                SELECT id, supplier_name, supplier_email 
+                FROM supplychain_supplier 
+                ORDER BY supplier_name ASC
+            """)
+            
+            suppliers = cursor.fetchall()
+            return [dict(supplier) for supplier in suppliers]
+            
+        except Exception as e:
+            raise Exception(f"Error fetching suppliers: {e}")
+        finally:
+            if cursor:
+                cursor.close()
 
 

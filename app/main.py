@@ -17,7 +17,8 @@ from schema import (
     InventorySearchQuery,
     EmailRequest,
     EmailResponse,
-    Email
+    Email,
+    Suppliers
 )
 from generator import Generator
 from database import Database
@@ -434,7 +435,7 @@ async def search_inventory(search_query: InventorySearchQuery):
 #         raise HTTPException(status_code=500, detail=str(e))
 
 
-# ==================== EMAIL GENERATION ENDPOINT ====================
+# ==================== Customer EMAIL GENERATION ENDPOINT ====================
 
 @app.post("/email-offer", response_model=EmailResponse)
 async def generate_email_for_offer(request: EmailRequest):
@@ -501,6 +502,51 @@ async def send_email(request: Email):
         return {"message": "Email sent successfully"}
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
+
+
+# ==================== Supplier EMAIL GENERATION ENDPOINT ====================
+
+# @app.get("/get-suppliers", response_model=Suppliers)
+# async def get_suppliers():
+#     """Get all suppliers with their id, name, and email"""
+#     try:
+#         # Fetch all suppliers from the database
+#         suppliers_data = database.get_all_suppliers()
+        
+#         # Transform to match the Supplier schema
+#         suppliers_list = [
+#             {
+#                 "supplier_id": str(supplier["id"]),
+#                 "supplier_name": supplier["supplier_name"],
+#                 "supplier_email": supplier["supplier_email"]
+#             }
+#             for supplier in suppliers_data
+#         ]
+        
+#         return {"suppliers": suppliers_list}
+    
+#     except Exception as e:
+#         raise HTTPException(status_code=500, detail=str(e))
+        
+# @app.post("/generate-supplier-email", response_model=EmailResponse)
+# async def generate_email_for_supplier(request: EmailRequest):
+#     """Generate email content for a customer based on offer ID"""
+#     try:
+#         # First, fetch the offer from the database
+#         offer = database.get_supplier_by_id(request.offer_id)
+#         if not offer:
+#             raise HTTPException(status_code=404, detail="Offer not found")
+        
+#         # Generate email content using AI
+#         email_response = emailManager.generate_supplier_email(offer)
+        
+#         return email_response
+    
+#     except HTTPException:
+#         raise
+#     except Exception as e:
+#         raise HTTPException(status_code=500, detail=str(e))
+ 
 
 if __name__ == "__main__":
     import uvicorn
