@@ -262,8 +262,8 @@ class Generator:
     
     # ==================== CHAT-BASED OFFER GENERATION ====================
     
-    # In-memory session storage (consider Redis for production)
-    _chat_sessions: Dict[str, List[Dict]] = {}
+    # In-memory session storage: {session_id: {"messages": [...], "customer_info": {...}, "project_start": ...}}
+    _chat_sessions: Dict[str, Dict] = {}
     
     # Tools for chat-based offer generation
     chat_tools = [
@@ -354,19 +354,32 @@ When ready to generate the offer, call generate_final_offer with:
 - time: Estimated completion time
 - materials_cost, labor_cost, total_cost: Price breakdown"""
 
-    def chat_for_offer(self, session_id: str, message: str, customer_info: dict, project_start) -> Dict:
+    def chat_for_offer(self, session_id: str, message: str, customer_info: dict = None, project_start = None) -> Dict:
         """
         Handle chat-based offer generation.
         Returns either a message (clarification) or a final offer.
+        
+        First message: customer_info and project_start are required and stored in session.
+        Follow-up messages: customer_info and project_start are optional (uses stored values).
         """
         try:
             # Get or create session
             if session_id not in self._chat_sessions:
-                self._chat_sessions[session_id] = [
-                    {"role": "system", "content": self.chat_system_prompt}
-                ]
+                # New session - customer info is required
+                if not customer_info:
+                    raise Exception("Session expired or not found. Please start a new conversation with customer info.")
+                
+                self._chat_sessions[session_id] = {
+                    "messages": [{"role": "system", "content": self.chat_system_prompt}],
+                    "customer_info": customer_info,
+                    "project_start": project_start
+                }
             
-            messages = self._chat_sessions[session_id]
+            session = self._chat_sessions[session_id]
+            messages = session["messages"]
+            stored_customer_info = session["customer_info"]
+            stored_project_start = session["project_start"]
+            
             messages.append({"role": "user", "content": message})
             
             # Call AI with tools
@@ -411,17 +424,17 @@ When ready to generate the offer, call generate_final_offer with:
                         )
                         
                         offer = Finaloffer(
-                            customer_name=customer_info.get("customer_name", ""),
-                            phone_number=customer_info.get("phone_number", ""),
-                            address=customer_info.get("address", ""),
-                            customer_email=customer_info.get("customer_email", ""),
+                            customer_name=stored_customer_info.get("customer_name", ""),
+                            phone_number=stored_customer_info.get("phone_number", ""),
+                            address=stored_customer_info.get("address", ""),
+                            customer_email=stored_customer_info.get("customer_email", ""),
                             task_description=arguments.get("task_description", ""),
                             bill_of_materials=bill_of_materials,
                             time=arguments.get("time", ""),
-                            resource=customer_info.get("resource", ""),
+                            resource=stored_customer_info.get("resource", ""),
                             status="Pending",
                             price=price,
-                            project_start=project_start,
+                            project_start=stored_project_start,
                             materials_ordered=False
                         )
                         

@@ -101,22 +101,36 @@ async def chat_for_offer(request: OfferChatRequest):
     try:
         # Generate session_id if new conversation
         session_id = request.session_id or str(uuid.uuid4())
+        is_new_session = request.session_id is None
         
-        # Prepare customer info (not sent to AI)
-        customer_info = {
-            "customer_name": request.customer_name,
-            "phone_number": request.phone_number,
-            "address": request.address,
-            "customer_email": request.customer_email,
-            "resource": request.resource
-        }
+        # For new sessions, customer info is required
+        if is_new_session:
+            if not all([request.customer_name, request.phone_number, request.address, 
+                       request.customer_email, request.project_start, request.resource]):
+                raise HTTPException(
+                    status_code=400, 
+                    detail="Customer info (customer_name, phone_number, address, customer_email, project_start, resource) is required for new conversations"
+                )
+            
+            customer_info = {
+                "customer_name": request.customer_name,
+                "phone_number": request.phone_number,
+                "address": request.address,
+                "customer_email": request.customer_email,
+                "resource": request.resource
+            }
+            project_start = request.project_start
+        else:
+            # Follow-up message - customer info not needed (stored in session)
+            customer_info = None
+            project_start = None
         
         # Call generator's chat method
         result = generator.chat_for_offer(
             session_id=session_id,
             message=request.message,
             customer_info=customer_info,
-            project_start=request.project_start
+            project_start=project_start
         )
         
         if result["type"] == "offer":
@@ -140,6 +154,8 @@ async def chat_for_offer(request: OfferChatRequest):
                 message=result["message"]
             )
     
+    except HTTPException:
+        raise
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
 

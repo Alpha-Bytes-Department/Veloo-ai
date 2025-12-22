@@ -124,13 +124,13 @@ class OfferChatRequest(BaseModel):
     session_id: Optional[str] = Field(None, description="Session ID for continuing conversation, None for new chat")
     user_id: str = Field(..., description="User ID")
     message: str = Field(..., description="User's message or initial request")
-    # Customer info (passed through, not sent to AI)
-    customer_name: str
-    phone_number: str
-    address: str
-    customer_email: str
-    project_start: date
-    resource: str  # Name of the assigned worker
+    # Customer info - Required for first message, optional for follow-ups
+    customer_name: Optional[str] = None
+    phone_number: Optional[str] = None
+    address: Optional[str] = None
+    customer_email: Optional[str] = None
+    project_start: Optional[date] = None
+    resource: Optional[str] = None  # Name of the assigned worker
 
 class OfferChatResponse(BaseModel):
     """Response from chat-based offer generation"""
