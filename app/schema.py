@@ -16,6 +16,7 @@ class offerRequest(BaseModel):
     select_task: str
     explaination: str
     user_id: str
+    resource: str  # Name of the assigned worker
 
 class Materials(BaseModel):
     category: str
@@ -30,7 +31,6 @@ class GeneratedOfferContent(BaseModel):
     task_description: str 
     bill_of_materials: List[Materials]
     time: str
-    resource: str  # Name of the available worker assigned to the task
     status: Literal["Pending", "Accepted", "Done"] = "Pending" 
     price: PriceDetail
     project_start: date
@@ -116,3 +116,25 @@ class Suppliers(BaseModel):
 class SupplierEmailRequest(BaseModel):
     supplier_id: str = Field(..., description="ID of the supplier")
     offer_id: str = Field(..., description="ID of the offer")
+
+# ==================== OFFER CHAT SCHEMAS ====================
+
+class OfferChatRequest(BaseModel):
+    """Request for chat-based offer generation"""
+    session_id: Optional[str] = Field(None, description="Session ID for continuing conversation, None for new chat")
+    user_id: str = Field(..., description="User ID")
+    message: str = Field(..., description="User's message or initial request")
+    # Customer info (passed through, not sent to AI)
+    customer_name: str
+    phone_number: str
+    address: str
+    customer_email: str
+    project_start: date
+    resource: str  # Name of the assigned worker
+
+class OfferChatResponse(BaseModel):
+    """Response from chat-based offer generation"""
+    session_id: str = Field(..., description="Session ID for continuing conversation")
+    response_type: Literal["message", "offer"] = Field(..., description="Type of response")
+    message: Optional[str] = Field(None, description="AI's clarification question or response")
+    offer: Optional[Finaloffer] = Field(None, description="Final offer when ready")

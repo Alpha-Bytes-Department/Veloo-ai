@@ -31,23 +31,6 @@ class Generator:
                         "required": ["query"],
                     },
                 }
-            },
-            {
-                "type": "function",
-                "function": {
-                    "name": "search_available_resources",
-                    "description": "Search for available workers (manpower resources) for a specific user. Returns the names of workers who are available to be assigned to tasks.",
-                    "parameters": {
-                        "type": "object",
-                        "properties": {
-                            "user_id": {
-                                "type": "string",
-                                "description": "The user ID to search available workers for.",
-                            },
-                        },
-                        "required": ["user_id"],
-                    },
-                }
             }
         ]
 
@@ -58,7 +41,6 @@ class Generator:
         - task_description: Detailed description of the work to be done
         - bill_of_materials: Array of materials needed (each with category, material, price, description, unit, quantity)
         - time: Estimated completion time.
-        - resource: Name of the assigned worker (use search_available_resources tool to get available workers)
         - status: Default to "Pending"
         - price: Object with Materials (float), Labor (float), and Total (float)
         - project_start: Use the exact project start date provided
@@ -117,33 +99,6 @@ class Generator:
                 "items": []
             }
     
-    def search_available_resources(self, user_id: str) -> Dict:
-        """
-        Search for available workers (manpower resources) for a specific user.
-        Returns the names of workers who are available to be assigned to tasks.
-        """
-        try:
-            if not self.database:
-                return {
-                    "error": "Database connection not available",
-                    "resources": []
-                }
-            
-            # Call database method to get available resources
-            resources = self.database.search_available_resources(user_id)
-            
-            return {
-                "user_id": user_id,
-                "resources_found": len(resources),
-                "resources": resources
-            }
-            
-        except Exception as e:
-            return {
-                "error": f"Error fetching available resources: {str(e)}",
-                "resources": []
-            }
-    
     
     def generate_offer(self, offer_request: offerRequest) -> Finaloffer:
         try:
@@ -164,8 +119,7 @@ class Generator:
             1. Detailed task_description based on the task selected and explanation
             2. Complete bill_of_materials with category, material name, price, description, unit, and quantity
             3. Time estimate for completion.
-            4. Available worker name in the 'resource' field (use search_available_resources tool to find and assign a worker)
-            5. Total price breakdown with Materials, Labor, and Total in the 'price' field
+            4. Total price breakdown with Materials, Labor, and Total in the 'price' field
             """
             
             # Create messages for chat completion
@@ -203,17 +157,7 @@ class Generator:
                             "content": json.dumps(inventory_data)
                         })
                     
-                    elif tool_call.function.name == "search_available_resources":
-                        # Execute the function logic
-                        arguments = json.loads(tool_call.function.arguments)
-                        resources_data = self.search_available_resources(arguments.get("user_id", ""))
-                        
-                        # 4. Provide function call results to the model
-                        messages.append({
-                            "role": "tool",
-                            "tool_call_id": tool_call.id,
-                            "content": json.dumps(resources_data)
-                        })
+
                 
                 # 5. Get final response with tool results (using GeneratedOfferContent - no personal info)
                 final_response = self.client.beta.chat.completions.parse(
@@ -242,7 +186,7 @@ class Generator:
                 task_description=generated_content.task_description,
                 bill_of_materials=generated_content.bill_of_materials,
                 time=generated_content.time,
-                resource=generated_content.resource,
+                resource=offer_request.resource,
                 status=generated_content.status,
                 price=generated_content.price,
                 project_start=generated_content.project_start,
@@ -266,7 +210,6 @@ class Generator:
             - Task Description: {update_request.task_description}
             - Bill of Materials: {update_request.bill_of_materials}
             - Time: {update_request.time}
-            - Resource: {update_request.resource}
             - Status: {update_request.status}
             - Project Start Date: {update_request.project_start}
             - Price: {update_request.price}
@@ -305,7 +248,7 @@ class Generator:
                 task_description=generated_content.task_description,
                 bill_of_materials=generated_content.bill_of_materials,
                 time=generated_content.time,
-                resource=generated_content.resource,
+                resource=update_request.resource,
                 status=generated_content.status,
                 price=generated_content.price,
                 project_start=generated_content.project_start,
@@ -316,4 +259,204 @@ class Generator:
         
         except Exception as e:
             raise Exception(f"Error generating offer: {str(e)}")
+    
+    # ==================== CHAT-BASED OFFER GENERATION ====================
+    
+    # In-memory session storage (consider Redis for production)
+    _chat_sessions: Dict[str, List[Dict]] = {}
+    
+    # Tools for chat-based offer generation
+    chat_tools = [
+        {
+            "type": "function",
+            "function": {
+                "name": "get_inventory_data",
+                "description": "Search the database for current information on inventory, pricing, and availability of materials and services.",
+                "parameters": {
+                    "type": "object",
+                    "properties": {
+                        "query": {
+                            "type": "string",
+                            "description": "The search query to find relevant information on the database.",
+                        },
+                    },
+                    "required": ["query"],
+                },
+            }
+        },
+        {
+            "type": "function",
+            "function": {
+                "name": "generate_final_offer",
+                "description": "Generate the final offer when you have gathered enough information from the user. Only call this when you have sufficient details about the project requirements, scope, and preferences.",
+                "parameters": {
+                    "type": "object",
+                    "properties": {
+                        "task_description": {
+                            "type": "string",
+                            "description": "Detailed description of the work to be done",
+                        },
+                        "bill_of_materials": {
+                            "type": "array",
+                            "description": "Array of materials needed",
+                            "items": {
+                                "type": "object",
+                                "properties": {
+                                    "category": {"type": "string"},
+                                    "material": {"type": "string"},
+                                    "price": {"type": "string"},
+                                    "description": {"type": "string"},
+                                    "unit": {"type": "string"},
+                                    "quantity": {"type": "string"}
+                                },
+                                "required": ["category", "material", "price", "description", "unit", "quantity"]
+                            }
+                        },
+                        "time": {
+                            "type": "string",
+                            "description": "Estimated completion time",
+                        },
+                        "materials_cost": {
+                            "type": "number",
+                            "description": "Total cost of materials",
+                        },
+                        "labor_cost": {
+                            "type": "number",
+                            "description": "Total cost of labor",
+                        },
+                        "total_cost": {
+                            "type": "number",
+                            "description": "Total project cost (materials + labor)",
+                        },
+                    },
+                    "required": ["task_description", "bill_of_materials", "time", "materials_cost", "labor_cost", "total_cost"],
+                },
+            }
+        }
+    ]
+    
+    chat_system_prompt = """You are a professional offer generator assistant for construction and service projects.
+
+Your role is to have a conversation with the user to understand their project requirements before generating an offer.
+
+IMPORTANT GUIDELINES:
+1. If the user's initial request is vague or missing important details, ask clarifying questions.
+2. Ask about: project scope, area size, preferred materials, quality level, timeline preferences, etc.
+3. Keep questions concise and focused - ask 1-2 questions at a time.
+4. When you have enough information to create a comprehensive offer, call the generate_final_offer tool.
+5. You can use get_inventory_data to check available materials and pricing.
+
+DO NOT generate an offer until you have sufficient details. It's better to ask questions than to make assumptions.
+
+When ready to generate the offer, call generate_final_offer with:
+- task_description: Detailed description of the work
+- bill_of_materials: Complete list of materials with prices
+- time: Estimated completion time
+- materials_cost, labor_cost, total_cost: Price breakdown"""
+
+    def chat_for_offer(self, session_id: str, message: str, customer_info: dict, project_start) -> Dict:
+        """
+        Handle chat-based offer generation.
+        Returns either a message (clarification) or a final offer.
+        """
+        try:
+            # Get or create session
+            if session_id not in self._chat_sessions:
+                self._chat_sessions[session_id] = [
+                    {"role": "system", "content": self.chat_system_prompt}
+                ]
+            
+            messages = self._chat_sessions[session_id]
+            messages.append({"role": "user", "content": message})
+            
+            # Call AI with tools
+            response = self.client.chat.completions.create(
+                model="gpt-4o-mini",
+                messages=messages,
+                tools=self.chat_tools,
+            )
+            
+            response_message = response.choices[0].message
+            tool_calls = response_message.tool_calls
+            
+            # Process tool calls
+            if tool_calls:
+                messages.append(response_message)
+                
+                for tool_call in tool_calls:
+                    if tool_call.function.name == "get_inventory_data":
+                        arguments = json.loads(tool_call.function.arguments)
+                        inventory_data = self.get_inventory_data(arguments.get("query", ""))
+                        messages.append({
+                            "role": "tool",
+                            "tool_call_id": tool_call.id,
+                            "content": json.dumps(inventory_data)
+                        })
+                    
+                    elif tool_call.function.name == "generate_final_offer":
+                        # AI decided to generate the offer
+                        arguments = json.loads(tool_call.function.arguments)
+                        
+                        # Build the final offer
+                        from schema import Finaloffer, Materials, PriceDetail
+                        
+                        bill_of_materials = [
+                            Materials(**mat) for mat in arguments.get("bill_of_materials", [])
+                        ]
+                        
+                        price = PriceDetail(
+                            Materials=arguments.get("materials_cost", 0),
+                            Labor=arguments.get("labor_cost", 0),
+                            Total=arguments.get("total_cost", 0)
+                        )
+                        
+                        offer = Finaloffer(
+                            customer_name=customer_info.get("customer_name", ""),
+                            phone_number=customer_info.get("phone_number", ""),
+                            address=customer_info.get("address", ""),
+                            customer_email=customer_info.get("customer_email", ""),
+                            task_description=arguments.get("task_description", ""),
+                            bill_of_materials=bill_of_materials,
+                            time=arguments.get("time", ""),
+                            resource=customer_info.get("resource", ""),
+                            status="Pending",
+                            price=price,
+                            project_start=project_start,
+                            materials_ordered=False
+                        )
+                        
+                        # Clear session after generating offer
+                        del self._chat_sessions[session_id]
+                        
+                        return {
+                            "type": "offer",
+                            "offer": offer
+                        }
+                
+                # If only inventory lookup, get follow-up response
+                follow_up = self.client.chat.completions.create(
+                    model="gpt-4o-mini",
+                    messages=messages,
+                )
+                
+                assistant_message = follow_up.choices[0].message.content
+                messages.append({"role": "assistant", "content": assistant_message})
+                
+                return {
+                    "type": "message",
+                    "message": assistant_message
+                }
+            
+            else:
+                # No tool calls - AI is asking a question or responding
+                assistant_message = response_message.content
+                messages.append({"role": "assistant", "content": assistant_message})
+                
+                return {
+                    "type": "message",
+                    "message": assistant_message
+                }
+        
+        except Exception as e:
+            raise Exception(f"Error in chat for offer: {str(e)}")
         

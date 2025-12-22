@@ -4,6 +4,7 @@ from typing import List, Optional
 from datetime import datetime, date
 from contextlib import asynccontextmanager
 import json
+import uuid
 
 from schema import (
     offerRequest, 
@@ -19,7 +20,9 @@ from schema import (
     EmailResponse,
     Email,
     Suppliers,
-    SupplierEmailRequest
+    SupplierEmailRequest,
+    OfferChatRequest,
+    OfferChatResponse
 )
 from generator import Generator
 from database import Database
@@ -88,6 +91,54 @@ async def generate_offer(request: offerRequest):
         offer_dict["bill_of_materials_string"] = bill_of_materials_string.strip()
 
         return offer_dict
+    
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+@app.post("/offers/chat", response_model=OfferChatResponse)
+async def chat_for_offer(request: OfferChatRequest):
+    """Chat-based offer generation with AI clarification"""
+    try:
+        # Generate session_id if new conversation
+        session_id = request.session_id or str(uuid.uuid4())
+        
+        # Prepare customer info (not sent to AI)
+        customer_info = {
+            "customer_name": request.customer_name,
+            "phone_number": request.phone_number,
+            "address": request.address,
+            "customer_email": request.customer_email,
+            "resource": request.resource
+        }
+        
+        # Call generator's chat method
+        result = generator.chat_for_offer(
+            session_id=session_id,
+            message=request.message,
+            customer_info=customer_info,
+            project_start=request.project_start
+        )
+        
+        if result["type"] == "offer":
+            # Save offer to database
+            offer = result["offer"]
+            offer_id = database.save_offer(offer, request.user_id)
+            
+            # Add ID to offer dict for response
+            offer_dict = offer.dict()
+            offer_dict["id"] = offer_id
+            
+            return OfferChatResponse(
+                session_id=session_id,
+                response_type="offer",
+                offer=offer
+            )
+        else:
+            return OfferChatResponse(
+                session_id=session_id,
+                response_type="message",
+                message=result["message"]
+            )
     
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
@@ -552,6 +603,12 @@ async def generate_email_for_supplier(request: SupplierEmailRequest):
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
  
+
+@app.get("/get-resources")
+async def get_resources(user_id: str):
+    """Get all suppliers with their id, name, and email"""
+    return database.search_available_resources(user_id)
+
 
 if __name__ == "__main__":
     import uvicorn
