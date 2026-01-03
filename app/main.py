@@ -11,6 +11,7 @@ from schema import (
     Finaloffer, 
     UpdateofferRequest,
     SaveUpdatedOffer,
+    SaveOfferRequest,
     UpdateStatus,
     OfferByDate,
     InventoryItem,
@@ -65,35 +66,35 @@ async def health_check():
     """Health check endpoint"""
     return {"status": "healthy", "timestamp": datetime.now()}
 
-@app.post("/offers/generate")
-async def generate_offer(request: offerRequest):
-    """Generate a new offer using AI"""
-    try:
-        # Generate offer using AI
-        offer = generator.generate_offer(request)
+# @app.post("/offers/generate")
+# async def generate_offer(request: offerRequest):
+#     """Generate a new offer using AI"""
+#     try:
+#         # Generate offer using AI
+#         offer = generator.generate_offer(request)
         
-        # Save to database with user_id
-        offer_id = database.save_offer(offer, request.user_id)
+#         # Save to database with user_id
+#         offer_id = database.save_offer(offer, request.user_id)
         
-        # Add the ID to the response
-        offer_dict = offer.dict()
-        offer_dict["id"] = offer_id
+#         # Add the ID to the response
+#         offer_dict = offer.dict()
+#         offer_dict["id"] = offer_id
         
-        # Parse bill of materials into a formatted string
-        bill_of_materials_string = ""
-        for idx, material in enumerate(offer.bill_of_materials, 1):
-            bill_of_materials_string += f"{idx}. {material.material}\n"
-            bill_of_materials_string += f"   Category: {material.category}\n"
-            bill_of_materials_string += f"   Quantity: {material.quantity} {material.unit}\n"
-            bill_of_materials_string += f"   Price: {material.price}\n"
-            bill_of_materials_string += f"   Description: {material.description}\n\n"
+#         # Parse bill of materials into a formatted string
+#         bill_of_materials_string = ""
+#         for idx, material in enumerate(offer.bill_of_materials, 1):
+#             bill_of_materials_string += f"{idx}. {material.material}\n"
+#             bill_of_materials_string += f"   Category: {material.category}\n"
+#             bill_of_materials_string += f"   Quantity: {material.quantity} {material.unit}\n"
+#             bill_of_materials_string += f"   Price: {material.price}\n"
+#             bill_of_materials_string += f"   Description: {material.description}\n\n"
         
-        offer_dict["bill_of_materials_string"] = bill_of_materials_string.strip()
+#         offer_dict["bill_of_materials_string"] = bill_of_materials_string.strip()
 
-        return offer_dict
+#         return offer_dict
     
-    except Exception as e:
-        raise HTTPException(status_code=500, detail=str(e))
+#     except Exception as e:
+#         raise HTTPException(status_code=500, detail=str(e))
 
 @app.post("/offers/chat", response_model=OfferChatResponse)
 async def chat_for_offer(request: OfferChatRequest):
@@ -136,16 +137,15 @@ async def chat_for_offer(request: OfferChatRequest):
         if result["type"] == "offer":
             # Save offer to database
             offer = result["offer"]
-            offer_id = database.save_offer(offer, request.user_id)
             
             # Add ID to offer dict for response
             offer_dict = offer.dict()
-            offer_dict["id"] = offer_id
+            offer_dict["user_id"] = request.user_id
             
             return OfferChatResponse(
                 session_id=session_id,
                 response_type="offer",
-                offer=offer
+                offer=offer_dict
             )
         else:
             return OfferChatResponse(
@@ -159,49 +159,74 @@ async def chat_for_offer(request: OfferChatRequest):
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
 
-@app.put("/offers/save")
-async def save_offer(request: SaveUpdatedOffer):
-    """Save or update a final offer directly to the database"""
+@app.post("/offers/save")
+async def save_new_offer(request: SaveOfferRequest):
+    """Save a new AI-generated offer to the database"""
     try:
-        # Extract offer_id from request
-        offer_id = request.offer_id
-        user_id = request.user_id
-        # Validate that offer_id is not empty or placeholder
-        if not offer_id or offer_id.lower() in ['string', 'null', 'undefined', '']:
-            raise HTTPException(status_code=400, detail="Invalid or missing offer_id")
-        
-        # Create Finaloffer object from request (excluding offer_id)
-        offer_data = request.dict(exclude={'offer_id'})
+        # Create Finaloffer object from request (excluding user_id)
+        offer_data = request.dict(exclude={'user_id'})
         offer = Finaloffer(**offer_data)
         
-        # Check if offer exists
-        existing_offer = database.get_offer_by_id(offer_id)
+        # Save to database and get the generated offer_id
+        offer_id = database.save_offer(offer, request.user_id)
         
-        if existing_offer:
-            # Update existing offer
-            success = database.update_offer(offer_id, offer, user_id)
-            if not success:
-                raise HTTPException(status_code=500, detail="Failed to update offer in database")
-            message = "Offer updated successfully"
-        else:
-            # Save new offer with specified offer_id
-            database.save_offer(offer, user_id)
-            message = "Offer saved successfully"
-        
-        # Return the saved/updated offer with its ID
+        # Return the saved offer with its ID
         offer_dict = offer.dict()
         offer_dict["id"] = offer_id
         
         return {
-            "message": message,
+            "message": "Offer saved successfully",
             "offer_id": offer_id,
+            "user_id": request.user_id,
             "offer": offer_dict
         }
     
-    except HTTPException:
-        raise
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
+
+# @app.put("/offers/save")
+# async def save_offer(request: SaveUpdatedOffer):
+#     """Save or update a final offer directly to the database"""
+#     try:
+#         # Extract offer_id from request
+#         offer_id = request.offer_id
+#         user_id = request.user_id
+#         # Validate that offer_id is not empty or placeholder
+#         if not offer_id or offer_id.lower() in ['string', 'null', 'undefined', '']:
+#             raise HTTPException(status_code=400, detail="Invalid or missing offer_id")
+        
+#         # Create Finaloffer object from request (excluding offer_id)
+#         offer_data = request.dict(exclude={'offer_id'})
+#         offer = Finaloffer(**offer_data)
+        
+#         # Check if offer exists
+#         existing_offer = database.get_offer_by_id(offer_id)
+        
+#         if existing_offer:
+#             # Update existing offer
+#             success = database.update_offer(offer_id, offer, user_id)
+#             if not success:
+#                 raise HTTPException(status_code=500, detail="Failed to update offer in database")
+#             message = "Offer updated successfully"
+#         else:
+#             # Save new offer with specified offer_id
+#             database.save_offer(offer, user_id)
+#             message = "Offer saved successfully"
+        
+#         # Return the saved/updated offer with its ID
+#         offer_dict = offer.dict()
+#         offer_dict["id"] = offer_id
+        
+#         return {
+#             "message": message,
+#             "offer_id": offer_id,
+#             "offer": offer_dict
+#         }
+    
+#     except HTTPException:
+#         raise
+#     except Exception as e:
+#         raise HTTPException(status_code=500, detail=str(e))
 
 # @app.get("/offers", response_model=List[dict])
 # async def get_all_offers(
@@ -262,10 +287,10 @@ async def delete_offer(offer_id: str):
 #         raise HTTPException(status_code=500, detail=str(e))
 
 @app.get("/offers/user/{user_id}")
-async def get_offers_by_user(user_id: str):
-    """Get all offers for a specific user"""
+async def get_offers_by_user(user_id: str, month: Optional[int] = None, year: Optional[int] = None):
+    """Get all offers for a specific user, optionally filtered by month and year"""
     try:
-        offers = database.get_offers_by_user(user_id)
+        offers = database.get_offers_by_user(user_id, month=month, year=year)
         return offers
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))

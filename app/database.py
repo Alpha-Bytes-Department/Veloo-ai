@@ -248,18 +248,28 @@ class Database:
             if cursor:
                 cursor.close()
     
-    def get_offers_by_user(self, user_id: str) -> List[Dict]:
-        """Get all offers for a specific user"""
+    def get_offers_by_user(self, user_id: str, month: int = None, year: int = None) -> List[Dict]:
+        """Get all offers for a specific user, optionally filtered by month and year"""
         cursor = None
         try:
             self.connect()
             cursor = self.get_cursor()
             
-            cursor.execute("""
-                SELECT * FROM offers 
-                WHERE user_id = %s 
-                ORDER BY created_at DESC
-            """, (user_id,))
+            # Build query with optional month/year filters
+            query = "SELECT * FROM offers WHERE user_id = %s"
+            params = [user_id]
+            
+            if year is not None:
+                query += " AND EXTRACT(YEAR FROM created_at) = %s"
+                params.append(year)
+            
+            if month is not None:
+                query += " AND EXTRACT(MONTH FROM created_at) = %s"
+                params.append(month)
+            
+            query += " ORDER BY created_at DESC"
+            
+            cursor.execute(query, tuple(params))
             
             offers = cursor.fetchall()
             return [dict(offer) for offer in offers]

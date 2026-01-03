@@ -1,5 +1,5 @@
 from pydantic import BaseModel, Field
-from typing import List, Optional, Literal
+from typing import List, Optional, Literal, Dict, Any
 from datetime import datetime, date
 
 class PriceDetail(BaseModel):
@@ -60,6 +60,10 @@ class UpdateStatus(BaseModel):
 
 class SaveUpdatedOffer(Finaloffer):
     offer_id: str
+    user_id: str
+
+class SaveOfferRequest(Finaloffer):
+    """Request to save a new AI-generated offer"""
     user_id: str
 
 class OfferByDate(BaseModel):
@@ -137,4 +141,4 @@ class OfferChatResponse(BaseModel):
     session_id: str = Field(..., description="Session ID for continuing conversation")
     response_type: Literal["message", "offer"] = Field(..., description="Type of response")
     message: Optional[str] = Field(None, description="AI's clarification question or response")
-    offer: Optional[Finaloffer] = Field(None, description="Final offer when ready")
+    offer: Optional[Dict[str, Any]] = Field(None, description="Final offer when ready")
