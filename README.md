@@ -71,7 +71,25 @@ Create a `.env` file in the project root:
 OPENAI_API_KEY=your_actual_openai_api_key_here
 MONGODB_URI=mongodb://localhost:27017/
 DATABASE_NAME=quotation_db
+
+# Email Configuration (for sending quotations via email)
+SENDER_EMAIL=your_gmail@gmail.com
+SENDER_EMAIL_PASSWORD=your_app_password
 ```
+
+#### Email Setup (Gmail)
+
+The application uses Gmail SMTP to send emails. To configure:
+
+1. **SENDER_EMAIL**: Your Gmail address (e.g., `yourname@gmail.com`)
+2. **SENDER_EMAIL_PASSWORD**: Create an **App Password** (regular password won't work):
+   - Go to [Google Account Security](https://myaccount.google.com/security)
+   - Enable **2-Step Verification** if not already enabled
+   - Navigate to [App Passwords](https://myaccount.google.com/apppasswords)
+   - Select **"Mail"** and your device, then click **Generate**
+   - Copy the 16-character password (spaces are optional)
+
+> ⚠️ **Important**: Do NOT use your regular Gmail password. Google requires App Passwords for third-party applications.
 
 ### 4. Run the Application
 
