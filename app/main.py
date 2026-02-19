@@ -6,7 +6,7 @@ from contextlib import asynccontextmanager
 import json
 import uuid
 
-from schema import (
+from app.schema import (
     offerRequest, 
     Finaloffer, 
     UpdateofferRequest,
@@ -25,9 +25,9 @@ from schema import (
     OfferChatRequest,
     OfferChatResponse
 )
-from generator import Generator
-from database import Database
-from email_manager import EmailManager
+from app.generator import Generator
+from app.database import Database
+from app.email_manager import EmailManager
 
 # Initialize components
 database = Database()
