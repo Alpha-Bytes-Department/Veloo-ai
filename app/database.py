@@ -4,7 +4,7 @@ from typing import List, Optional, Dict
 from datetime import datetime, date
 import os
 from dotenv import load_dotenv
-from schema import Finaloffer, InventoryItem
+from app.schema import Finaloffer, InventoryItem
 import json
 
 # Load environment variables
