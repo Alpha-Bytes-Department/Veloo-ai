@@ -2,7 +2,7 @@ from openai import OpenAI
 from typing import List, Dict
 import os
 import json
-from schema import EmailResponse, Email
+from app.schema import EmailResponse, Email
 from dotenv import load_dotenv
 from datetime import datetime
 import smtplib
