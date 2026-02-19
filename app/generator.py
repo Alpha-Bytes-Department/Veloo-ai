@@ -2,7 +2,7 @@ from openai import OpenAI
 from typing import List, Dict
 import os
 import json
-from schema import offerRequest, Finaloffer, GeneratedOfferContent, EmailRequest, EmailResponse
+from app.schema import offerRequest, Finaloffer, GeneratedOfferContent, EmailRequest, EmailResponse
 from dotenv import load_dotenv
 from datetime import datetime
 
